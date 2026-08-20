@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +40,36 @@ const TokenHeader = "X-Session-Token"
 
 // RefreshTokenCookie is the cookie used to store a user's refresh token
 const RefreshTokenCookie = "refreshToken"
+
+// SessionCookie is the cookie used to authenticate content that is embedded in
+// the UI and cannot set the session token header on its own sub-requests. It is
+// scoped to the routes that serve embedded content.
+const SessionCookie = "sessionToken"
+
+// EmbeddedContentPath is the path prefix serving content embedded in the UI.
+const EmbeddedContentPath = "/api/grafana"
+
+// newSessionCookie returns the cookie authenticating embedded content with the
+// given session token.
+func newSessionCookie(token string, expires time.Time) *http.Cookie {
+	return &http.Cookie{
+		Name:     SessionCookie,
+		Value:    token,
+		Path:     EmbeddedContentPath,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  expires,
+	}
+}
+
+// expiredSessionCookie returns a cookie that expires the embedded content
+// session cookie in the browser.
+func expiredSessionCookie() *http.Cookie {
+	cookie := newSessionCookie("", time.Time{})
+	cookie.MaxAge = -1
+	return cookie
+}
 
 // returnNewJWT will return a new JSON web token to the requestor.
 func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResult, authorized bool, state string) {
@@ -71,6 +102,16 @@ func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResul
 			HttpOnly: true,
 			Secure:   true,
 		})
+	}
+
+	if authorized {
+		// Set a Secure, HttpOnly cookie scoped to the embedded content routes, so
+		// that iframed content can be authenticated without the token being
+		// readable by the browser or sent to any other route.
+		http.SetCookie(w, newSessionCookie(newToken, time.Unix(claims.ExpiresAt, 0)))
+	} else {
+		// Expire any cookie left over from a previous authorized session.
+		http.SetCookie(w, expiredSessionCookie())
 	}
 
 	// return the token to the user

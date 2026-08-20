@@ -58,6 +58,8 @@ func (d *desktopAPI) PostLogout(w http.ResponseWriter, r *http.Request) {
 			Secure:   true,
 		})
 	}
+	// Clear the session cookie used for embedded content
+	http.SetCookie(w, expiredSessionCookie())
 	apiutil.WriteOK(w)
 }
 

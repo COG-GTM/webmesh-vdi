@@ -31,15 +31,7 @@ import (
 func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get the auth token
-		var authToken string
-
-		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			// the websocket route does not receive request headers from noVNC, so the token is passed
-			// as a query argument. This effectively gives that option to all routes.
-			if keys, ok := r.URL.Query()["token"]; ok {
-				authToken = keys[0]
-			}
-		}
+		authToken := getAuthTokenFromRequest(r)
 
 		// if we don't have a token we can't proceed
 		if authToken == "" {
@@ -73,4 +65,59 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		// serve the next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ValidateEmbeddedSession verifies that a request carries a valid and authorized
+// user session before serving the given handler. It is used for content that is
+// embedded in the UI, which cannot set the session token header on its own
+// sub-requests, and so takes the session token from the session cookie. The
+// token query argument is not accepted, to keep session tokens out of the URLs
+// of embedded content.
+func (d *desktopAPI) ValidateEmbeddedSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authToken := r.Header.Get(TokenHeader)
+		if authToken == "" {
+			if cookie, err := r.Cookie(SessionCookie); err == nil {
+				authToken = cookie.Value
+			}
+		}
+
+		if authToken == "" {
+			apiutil.ReturnAPIForbidden(nil, "No token provided in request", w)
+			return
+		}
+
+		jwtSecret, err := d.secrets.ReadSecret(v1.JWTSecretKey, true)
+		if err != nil {
+			apiutil.ReturnAPIError(err, w)
+			return
+		}
+
+		session, err := apiutil.DecodeAndVerifyJWT(jwtSecret, authToken)
+		if err != nil {
+			apiutil.ReturnAPIUnauthorized(nil, err.Error(), w)
+			return
+		}
+
+		if !session.Authorized {
+			apiutil.ReturnAPIForbidden(nil, "User session is not authorized", w)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// getAuthTokenFromRequest returns the session token provided in the request
+// headers, falling back to the token query argument. The websocket routes do
+// not receive request headers from noVNC, so the token is passed as a query
+// argument. This effectively gives that option to all routes.
+func getAuthTokenFromRequest(r *http.Request) string {
+	if authToken := r.Header.Get(TokenHeader); authToken != "" {
+		return authToken
+	}
+	if keys, ok := r.URL.Query()["token"]; ok {
+		return keys[0]
+	}
+	return ""
 }
