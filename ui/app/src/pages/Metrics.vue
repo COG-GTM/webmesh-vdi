@@ -31,7 +31,9 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 // session while the page sits open. Renew it here instead, otherwise the
 // dashboard starts returning forbidden once the access token expires.
 const fallbackDelay = 5 * 60 * 1000
-const minDelay = 30 * 1000
+// Only a floor against an expiry that is already in the past, so that short
+// token durations still renew at half their lifetime.
+const minDelay = 5 * 1000
 
 export default {
   name: 'Metrics',

@@ -34,9 +34,13 @@ var broadcastNewToken = new BroadcastChannel('kvdi_new_token')
 // on an already consumed token. Callers share the in-flight request instead.
 let refreshPromise = null
 
+// The renewal is requested on its own client, so that it can never be retried
+// by the interceptor that is waiting on it.
+const refreshClient = axios.create()
+
 async function requestNewToken (commit) {
   try {
-    const res = await axios({ url: '/api/refresh_token', method: 'GET' })
+    const res = await refreshClient({ url: '/api/refresh_token', method: 'GET' })
 
     const token = res.data.token
     const renewable = res.data.renewable
