@@ -85,7 +85,7 @@ func (d *desktopAPI) buildRouter() error {
 	// Grafana proxy - It doesn't fit well into the existing permission paradigms,
 	// so it is served to any authorized user session. The UI embeds it in an
 	// iframe, so the session is validated from the session cookie as well as the
-	// usual header and query argument.
+	// usual header.
 	grafanaProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",

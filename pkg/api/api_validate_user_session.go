@@ -70,10 +70,12 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 // ValidateEmbeddedSession verifies that a request carries a valid and authorized
 // user session before serving the given handler. It is used for content that is
 // embedded in the UI, which cannot set the session token header on its own
-// sub-requests, and so also accepts the session token from the session cookie.
+// sub-requests, and so takes the session token from the session cookie. The
+// token query argument is not accepted, to keep session tokens out of the URLs
+// of embedded content.
 func (d *desktopAPI) ValidateEmbeddedSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authToken := getAuthTokenFromRequest(r)
+		authToken := r.Header.Get(TokenHeader)
 		if authToken == "" {
 			if cookie, err := r.Cookie(SessionCookie); err == nil {
 				authToken = cookie.Value
