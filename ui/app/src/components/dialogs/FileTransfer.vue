@@ -339,11 +339,13 @@ export default {
         const errMsg = await getErrorMessage(err)
         this.handleError(new Error(`Failed to download ${path.basename(fpath)}: ${errMsg}`))
 
+        this.downloadIndeterminate = false
         this.downloaded = false
         this.downloading = false
         return
       }
 
+      this.downloadIndeterminate = false
       this.downloadProgress = 1
       this.downloading = false
       this.downloaded = true
