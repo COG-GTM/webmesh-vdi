@@ -30,12 +30,52 @@ function uuidv4 () {
 
 var broadcastNewToken = new BroadcastChannel('kvdi_new_token')
 
+// Refresh tokens are single-use, so concurrent renewals would race each other
+// on an already consumed token. Callers share the in-flight request instead.
+let refreshPromise = null
+
+async function requestNewToken (commit, background) {
+  try {
+    const res = await axios({ url: '/api/refresh_token', method: 'GET' })
+
+    const token = res.data.token
+    const renewable = res.data.renewable
+    const expiresAt = res.data.expiresAt
+
+    Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
+    commit('auth_success', { token, renewable, expiresAt })
+    broadcastNewToken.postMessage({ token, renewable, expiresAt })
+    return token
+  } catch (err) {
+    // Background renewals are not driven by anything the user did, so they
+    // report the failure to the console instead of ending the session.
+    if (background) {
+      throw err
+    }
+    commit('auth_error')
+    let error
+    if (err.response !== undefined && err.response.data !== undefined) {
+      error = err.response.data.error
+    } else {
+      error = err.message
+    }
+    Vue.prototype.$q.notify({
+      color: 'red-4',
+      textColor: 'black',
+      icon: 'error',
+      message: error
+    })
+    throw err
+  }
+}
+
 export const UserStore = new Vuex.Store({
 
   state: {
     status: '',
     token: localStorage.getItem('token') || '',
     renewable: localStorage.getItem('renewable') === 'true' || false,
+    expiresAt: Number(localStorage.getItem('expiresAt')) || 0,
     requiresMFA: false,
     user: {},
     stateToken: ''
@@ -58,12 +98,14 @@ export const UserStore = new Vuex.Store({
       state.user = user
     },
 
-    auth_success (state, { token, renewable }) {
+    auth_success (state, { token, renewable, expiresAt }) {
       state.status = 'success'
       state.token = token
       state.renewable = renewable
+      state.expiresAt = Number(expiresAt) || 0
       localStorage.setItem('token', token)
       localStorage.setItem('renewable', String(renewable))
+      localStorage.setItem('expiresAt', String(state.expiresAt))
 
       state.stateToken = ''
       state.requiresMFA = false
@@ -80,9 +122,11 @@ export const UserStore = new Vuex.Store({
       state.token = ''
       state.stateToken = ''
       state.renewable = false
+      state.expiresAt = 0
       localStorage.removeItem('token')
       localStorage.removeItem('state')
       localStorage.removeItem('renewable')
+      localStorage.removeItem('expiresAt')
     },
 
     logout (state) {
@@ -91,9 +135,11 @@ export const UserStore = new Vuex.Store({
       state.token = ''
       state.stateToken = ''
       state.renewable = false
+      state.expiresAt = 0
       localStorage.removeItem('token')
       localStorage.removeItem('state')
       localStorage.removeItem('renewable')
+      localStorage.removeItem('expiresAt')
     }
 
   },
@@ -117,7 +163,7 @@ export const UserStore = new Vuex.Store({
       })
       broadcastNewToken.addEventListener('message', (ev) => {
         console.log('Got new token from other browser session')
-        commit('auth_success', { token: ev.data.token, renewable: ev.data.renewable })
+        commit('auth_success', { token: ev.data.token, renewable: ev.data.renewable, expiresAt: ev.data.expiresAt })
         Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = ev.data.token
       })
       if (!this.getters.isLoggedIn) {
@@ -182,11 +228,12 @@ export const UserStore = new Vuex.Store({
         const user = res.data.user
         const authorized = res.data.authorized
         const renewable = res.data.renewable
+        const expiresAt = res.data.expiresAt
 
         Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
         commit('auth_got_user', user)
         if (authorized) {
-          commit('auth_success', { token, renewable })
+          commit('auth_success', { token, renewable, expiresAt })
           return
         }
         commit('auth_need_mfa')
@@ -196,33 +243,16 @@ export const UserStore = new Vuex.Store({
       }
     },
 
-    async refreshToken ({ commit }) {
+    async refreshToken ({ commit }, opts) {
+      if (refreshPromise !== null) {
+        return refreshPromise
+      }
       console.log('Refreshing access token')
+      refreshPromise = requestNewToken(commit, !!(opts && opts.background))
       try {
-        const res = await axios({ url: '/api/refresh_token', method: 'GET' })
-
-        const token = res.data.token
-        const renewable = res.data.renewable
-
-        Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
-        commit('auth_success', { token, renewable })
-        broadcastNewToken.postMessage({ token, renewable })
-        return token
-      } catch (err) {
-        commit('auth_error')
-        let error
-        if (err.response !== undefined && err.response.data !== undefined) {
-          error = err.response.data.error
-        } else {
-          error = err.message
-        }
-        Vue.prototype.$q.notify({
-          color: 'red-4',
-          textColor: 'black',
-          icon: 'error',
-          message: error
-        })
-        throw err
+        return await refreshPromise
+      } finally {
+        refreshPromise = null
       }
     },
 
@@ -237,9 +267,10 @@ export const UserStore = new Vuex.Store({
       const token = res.data.token
       const authorized = res.data.authorized
       const renewable = res.data.renewable
+      const expiresAt = res.data.expiresAt
       Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
       if (authorized) {
-        commit('auth_success', { token, renewable })
+        commit('auth_success', { token, renewable, expiresAt })
       }
     },
 
@@ -276,7 +307,8 @@ export const UserStore = new Vuex.Store({
     user: state => state.user,
     token: state => state.token,
     stateToken: state => state.stateToken,
-    renewable: state => state.renewable
+    renewable: state => state.renewable,
+    expiresAt: state => state.expiresAt
   }
 
 })

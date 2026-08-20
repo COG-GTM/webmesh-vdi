@@ -20,7 +20,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <iframe v-if="ready" class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
     </div>
   </q-page>
 </template>
@@ -28,32 +28,53 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <script>
 // The dashboard is authenticated by the session cookie issued with the access
 // token, and its requests do not go through axios, so nothing renews the
-// session while the page sits open. Renew it on a timer instead, otherwise the
+// session while the page sits open. Renew it here instead, otherwise the
 // dashboard starts returning forbidden once the access token expires.
-const refreshInterval = 5 * 60 * 1000
+const fallbackDelay = 5 * 60 * 1000
+const minDelay = 30 * 1000
 
 export default {
   name: 'Metrics',
 
-  mounted () {
-    this.refresh()
-    this.timer = setInterval(this.refresh, refreshInterval)
+  data () {
+    return {
+      // The iframe request cannot be retried, so it is only made once the
+      // session cookie is known to be current.
+      ready: false
+    }
+  },
+
+  async mounted () {
+    await this.refresh()
+    this.ready = true
   },
 
   beforeDestroy () {
-    clearInterval(this.timer)
+    clearTimeout(this.timer)
   },
 
   methods: {
     async refresh () {
+      clearTimeout(this.timer)
       if (!this.$userStore.getters.renewable) {
         return
       }
       try {
-        await this.$userStore.dispatch('refreshToken')
+        await this.$userStore.dispatch('refreshToken', { background: true })
       } catch (err) {
         console.error(err)
       }
+      this.timer = setTimeout(this.refresh, this.nextDelay())
+    },
+
+    // nextDelay renews halfway through the remaining lifetime of the token, so
+    // that a token duration shorter than the fallback still works.
+    nextDelay () {
+      const expiresAt = this.$userStore.getters.expiresAt
+      if (!expiresAt) {
+        return fallbackDelay
+      }
+      return Math.max((expiresAt * 1000 - Date.now()) / 2, minDelay)
     }
   }
 }
