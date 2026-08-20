@@ -72,7 +72,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/kustomize/$(KUSTOMIZE_VERSION)/hack/install_kustomize.sh"
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -151,7 +151,7 @@ build-manager:
 ## make build-app          # Build the app docker image.
 build-app:
 	VERSION=$(VERSION) $(GORELEASER) build --single-target --id app $(BUILD_ARGS)
-	cd ui/app && yarn install && quasar build
+	cd ui/app && yarn install --frozen-lockfile && quasar build
 	docker build . \
 		-f build/Dockerfile.app \
 		-t $(APP_IMAGE) \
@@ -239,7 +239,7 @@ push-proxy: build-proxy
 GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
 GOLANGCI_VERSION ?= v1.53.3
 $(GOLANGCI_LINT):
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_VERSION)/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
 
 ## make lint   # Lint files
 lint: $(GOLANGCI_LINT)
