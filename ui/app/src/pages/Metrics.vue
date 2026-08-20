@@ -50,6 +50,7 @@ export default {
   },
 
   beforeDestroy () {
+    this.stopped = true
     clearTimeout(this.timer)
   },
 
@@ -63,6 +64,11 @@ export default {
         await this.$userStore.dispatch('refreshToken', { background: true })
       } catch (err) {
         console.error(err)
+      }
+      // The page may have been left while the renewal was in flight, in which
+      // case beforeDestroy already cleared a timer that did not exist yet.
+      if (this.stopped) {
+        return
       }
       this.timer = setTimeout(this.refresh, this.nextDelay())
     },

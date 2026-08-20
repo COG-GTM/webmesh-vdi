@@ -34,7 +34,7 @@ var broadcastNewToken = new BroadcastChannel('kvdi_new_token')
 // on an already consumed token. Callers share the in-flight request instead.
 let refreshPromise = null
 
-async function requestNewToken (commit, background) {
+async function requestNewToken (commit) {
   try {
     const res = await axios({ url: '/api/refresh_token', method: 'GET' })
 
@@ -46,26 +46,8 @@ async function requestNewToken (commit, background) {
     commit('auth_success', { token, renewable, expiresAt })
     broadcastNewToken.postMessage({ token, renewable, expiresAt })
     return token
-  } catch (err) {
-    // Background renewals are not driven by anything the user did, so they
-    // report the failure to the console instead of ending the session.
-    if (background) {
-      throw err
-    }
-    commit('auth_error')
-    let error
-    if (err.response !== undefined && err.response.data !== undefined) {
-      error = err.response.data.error
-    } else {
-      error = err.message
-    }
-    Vue.prototype.$q.notify({
-      color: 'red-4',
-      textColor: 'black',
-      icon: 'error',
-      message: error
-    })
-    throw err
+  } finally {
+    refreshPromise = null
   }
 }
 
@@ -244,15 +226,33 @@ export const UserStore = new Vuex.Store({
     },
 
     async refreshToken ({ commit }, opts) {
-      if (refreshPromise !== null) {
-        return refreshPromise
+      if (refreshPromise === null) {
+        console.log('Refreshing access token')
+        refreshPromise = requestNewToken(commit)
       }
-      console.log('Refreshing access token')
-      refreshPromise = requestNewToken(commit, !!(opts && opts.background))
       try {
         return await refreshPromise
-      } finally {
-        refreshPromise = null
+      } catch (err) {
+        // Background renewals are not driven by anything the user did, so they
+        // leave the session alone and let their caller log the failure. Every
+        // caller handles the shared request's failure for itself.
+        if (opts && opts.background) {
+          throw err
+        }
+        commit('auth_error')
+        let error
+        if (err.response !== undefined && err.response.data !== undefined) {
+          error = err.response.data.error
+        } else {
+          error = err.message
+        }
+        Vue.prototype.$q.notify({
+          color: 'red-4',
+          textColor: 'black',
+          icon: 'error',
+          message: error
+        })
+        throw err
       }
     },
 
