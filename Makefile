@@ -72,7 +72,8 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+KUSTOMIZE_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/kubernetes-sigs/kustomize/kustomize/$(KUSTOMIZE_VERSION)/hack/install_kustomize.sh
+KUSTOMIZE_INSTALL_SHA256 ?= f0d2b3026bfbfb935f413b65c82307049dfcb3286a0a49a62427a8d2c117cdd8
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -80,7 +81,13 @@ $(KUSTOMIZE): $(LOCALBIN)
 		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/kustomize; \
 	fi
-	test -s $(LOCALBIN)/kustomize || { curl -Ss $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
+	test -s $(LOCALBIN)/kustomize || { \
+		TMP_DIR=$$(mktemp -d); \
+		trap 'rm -rf "$$TMP_DIR"' EXIT; \
+		curl -SsL -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)"; \
+		echo "$(KUSTOMIZE_INSTALL_SHA256)  $$TMP_DIR/install_kustomize.sh" | sha256sum -c -; \
+		bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); \
+	}
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -238,8 +245,14 @@ push-proxy: build-proxy
 
 GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
 GOLANGCI_VERSION ?= v1.53.3
+GOLANGCI_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_VERSION)/install.sh
+GOLANGCI_INSTALL_SHA256 ?= 060f1f3deb31b3d3b9515d691d9a776354cd63c7fcb5e036f18f0444cf2c934b
 $(GOLANGCI_LINT):
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
+	TMP_DIR=$$(mktemp -d); \
+	trap 'rm -rf "$$TMP_DIR"' EXIT; \
+	curl -sSfL -o "$$TMP_DIR/install.sh" "$(GOLANGCI_INSTALL_SCRIPT)"; \
+	echo "$(GOLANGCI_INSTALL_SHA256)  $$TMP_DIR/install.sh" | sha256sum -c -; \
+	sh "$$TMP_DIR/install.sh" -b $(GOBIN) $(GOLANGCI_VERSION)
 
 ## make lint   # Lint files
 lint: $(GOLANGCI_LINT)
