@@ -3,6 +3,10 @@
 # K3s/Prometheus constants
 export INSTALL_K3S_SKIP_START="true"
 export INSTALL_K3S_EXEC="server --disable traefik"
+export INSTALL_K3S_VERSION="v1.28.15+k3s1"
+# Refresh the checksum when changing the version embedded in the installer URL.
+export K3S_INSTALL_URL="https://raw.githubusercontent.com/k3s-io/k3s/${INSTALL_K3S_VERSION}/install.sh"
+export K3S_INSTALL_SHA256="5f785120f00ef4b0aba205161232d2a04b6e7a75332cae7059fcc1f517340777"
 export PROMETHEUS_OPERATOR_VERSION="v0.41.0"
 export K3S_MANIFEST_DIR="/var/lib/rancher/k3s/server/manifests"
 
@@ -10,7 +14,12 @@ export K3S_MANIFEST_DIR="/var/lib/rancher/k3s/server/manifests"
 # via the above variables.
 function install-k3s() {
     echo "[INFO]  K3s will be installed to your system"
-    curl -sfL https://get.k3s.io | sh -
+    tmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'kvdi-k3s') || return 1
+    trap "rm -rf ${tmpdir}" RETURN || return 1
+
+    curl -sfL -o "${tmpdir}/install-k3s.sh" "${K3S_INSTALL_URL}" || return 1
+    echo "${K3S_INSTALL_SHA256}  ${tmpdir}/install-k3s.sh" | sha256sum -c - || return 1
+    bash "${tmpdir}/install-k3s.sh"
 }
 
 # Starts K3s and waits for 5 seconds. The wait gives a little extra time for the 
