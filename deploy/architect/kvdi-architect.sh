@@ -5,6 +5,10 @@ export INSTALL_K3S_SKIP_START="true"
 export INSTALL_K3S_EXEC="server --disable traefik"
 export PROMETHEUS_OPERATOR_VERSION="v0.41.0"
 export K3S_MANIFEST_DIR="/var/lib/rancher/k3s/server/manifests"
+# Pin the kVDI helm-charts source to an immutable commit SHA instead of the
+# mutable "main" branch, so the fetched chart/index/manifest content cannot
+# change between installs.
+export HELM_CHARTS_REF="${HELM_CHARTS_REF:-9f268799907a08da6b4a683605344ad2d5dba8e0}"
 
 # Installs K3s using the official installer. Configurations are passed
 # via the above variables.
@@ -61,7 +65,7 @@ function fetch-helm-chart() {
         -w /workspace \
         -v "${tmpdir}":/workspace \
             alpine/helm:3.2.4 \
-            fetch --untar https://raw.githubusercontent.com/kvdi/helm-charts/main/charts/kvdi-${VERSION}.tgz 1> /dev/null
+            fetch --untar https://raw.githubusercontent.com/kvdi/helm-charts/${HELM_CHARTS_REF}/charts/kvdi-${VERSION}.tgz 1> /dev/null
 
     echo "${tmpdir}"
 }
@@ -71,7 +75,7 @@ function get-helm-chart() {
     if [[ "${VERSION}" == "" ]] ; then
         dialog --backtitle "kVDI Architect" \
             --infobox "Fetching latest version of kVDI" 5 50
-        export VERSION=$(curl https://raw.githubusercontent.com/kvdi/helm-charts/main/charts/index.yaml 2> /dev/null | head | grep appVersion | awk '{print$2}')
+        export VERSION=$(curl https://raw.githubusercontent.com/kvdi/helm-charts/${HELM_CHARTS_REF}/charts/index.yaml 2> /dev/null | head | grep appVersion | awk '{print$2}')
         sleep 1
     fi
 
@@ -573,7 +577,7 @@ metadata:
   namespace: kube-system
 spec:
   chart: kvdi
-  repo: https://raw.githubusercontent.com/kvdi/helm-charts/main/charts
+  repo: https://raw.githubusercontent.com/kvdi/helm-charts/${HELM_CHARTS_REF}/charts
   targetNamespace: default
   valuesContent: |-
 $(sed 's/^/    /g' "${CHART_DIR}/kvdi/values.yaml")
