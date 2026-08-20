@@ -75,6 +75,17 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 KUSTOMIZE_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/kubernetes-sigs/kustomize/kustomize/$(KUSTOMIZE_VERSION)/hack/install_kustomize.sh
 # Refresh the checksum when changing the version embedded in the installer URL.
 KUSTOMIZE_INSTALL_SHA256 ?= f0d2b3026bfbfb935f413b65c82307049dfcb3286a0a49a62427a8d2c117cdd8
+define verify-sha256
+if command -v sha256sum >/dev/null 2>&1; then \
+	echo "$(1)  $(2)" | sha256sum -c -; \
+elif command -v shasum >/dev/null 2>&1; then \
+	actual=$$(shasum -a 256 "$(2)" | awk '{print $$1}') && \
+	test "$(1)" = "$$actual"; \
+else \
+	echo "error: sha256sum or shasum is required to verify $(2)" >&2; \
+	exit 1; \
+fi
+endef
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -86,7 +97,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 		TMP_DIR=$$(mktemp -d) && \
 		trap 'rm -rf "$$TMP_DIR"' EXIT && \
 		curl -SsL -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)" && \
-		echo "$(KUSTOMIZE_INSTALL_SHA256)  $$TMP_DIR/install_kustomize.sh" | sha256sum -c - && \
+		$(call verify-sha256,$(KUSTOMIZE_INSTALL_SHA256),$$TMP_DIR/install_kustomize.sh) && \
 		bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); \
 	}
 
@@ -253,7 +264,7 @@ $(GOLANGCI_LINT):
 	TMP_DIR=$$(mktemp -d) && \
 	trap 'rm -rf "$$TMP_DIR"' EXIT && \
 	curl -sSfL -o "$$TMP_DIR/install.sh" "$(GOLANGCI_INSTALL_SCRIPT)" && \
-	echo "$(GOLANGCI_INSTALL_SHA256)  $$TMP_DIR/install.sh" | sha256sum -c - && \
+	$(call verify-sha256,$(GOLANGCI_INSTALL_SHA256),$$TMP_DIR/install.sh) && \
 	sh "$$TMP_DIR/install.sh" -b $(GOBIN) $(GOLANGCI_VERSION)
 
 ## make lint   # Lint files
