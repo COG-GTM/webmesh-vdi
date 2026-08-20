@@ -28,7 +28,7 @@ import (
 
 // GrafanaTokenCookie is the cookie used to carry the access token on requests
 // made from the metrics iframe. Grafana loads its own assets and issues its own
-// XHRs, none of which can set the token header or query argument.
+// XHRs, none of which can set the token header.
 const GrafanaTokenCookie = "grafanaToken"
 
 // grafanaProxyPath is the path the grafana proxy is served on.
@@ -36,8 +36,8 @@ const grafanaProxyPath = "/api/grafana"
 
 // ValidateGrafanaSession ensures that requests to the grafana proxy carry a
 // valid, authorized user session. The token can be provided in the session
-// header, in a token query argument, or in the cookie this handler sets on the
-// first successful request.
+// header, or in the cookie this handler sets on the first request that
+// authenticates with the header.
 func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authToken, fromCookie := getGrafanaAuthToken(r)
@@ -71,7 +71,7 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 				Value:    authToken,
 				Path:     grafanaProxyPath,
 				HttpOnly: true,
-				Secure:   true,
+				Secure:   r.TLS != nil,
 				SameSite: http.SameSiteStrictMode,
 			})
 		}
@@ -86,9 +86,6 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 func getGrafanaAuthToken(r *http.Request) (token string, fromCookie bool) {
 	if token = r.Header.Get(TokenHeader); token != "" {
 		return token, false
-	}
-	if keys, ok := r.URL.Query()["token"]; ok && keys[0] != "" {
-		return keys[0], false
 	}
 	if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
 		return cookie.Value, true
