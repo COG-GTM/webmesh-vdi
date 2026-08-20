@@ -96,7 +96,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 	test -s $(LOCALBIN)/kustomize || { \
 		TMP_DIR=$$(mktemp -d) && \
 		trap 'rm -rf "$$TMP_DIR"' EXIT && \
-		curl -SsL -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)" && \
+		curl -SsLf -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)" && \
 		$(call verify-sha256,$(KUSTOMIZE_INSTALL_SHA256),$$TMP_DIR/install_kustomize.sh) && \
 		(cd "$(LOCALBIN)" && bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION))); \
 	}
