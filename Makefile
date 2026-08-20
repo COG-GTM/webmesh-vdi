@@ -72,9 +72,9 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-KUSTOMIZE_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/kubernetes-sigs/kustomize/kustomize/$(KUSTOMIZE_VERSION)/hack/install_kustomize.sh
-# Refresh the checksum when changing the version embedded in the installer URL.
-KUSTOMIZE_INSTALL_SHA256 ?= f0d2b3026bfbfb935f413b65c82307049dfcb3286a0a49a62427a8d2c117cdd8
+KUSTOMIZE_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/kubernetes-sigs/kustomize/cf33ea71bf0a7c924f908189cb55fa677d3afa4b/hack/install_kustomize.sh
+# Refresh the checksum when changing the pinned installer commit or version.
+KUSTOMIZE_INSTALL_SHA256 ?= 0a76e6dd4e73b9bc0cac5ba9f014bf04f07c462de234ebcabc0bddf79c3ccc0d
 define verify-sha256
 if command -v sha256sum >/dev/null 2>&1; then \
 	echo "$(1)  $(2)" | sha256sum -c -; \
@@ -98,7 +98,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 		trap 'rm -rf "$$TMP_DIR"' EXIT && \
 		curl -SsLf -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)" && \
 		$(call verify-sha256,$(KUSTOMIZE_INSTALL_SHA256),$$TMP_DIR/install_kustomize.sh) && \
-		(cd "$(LOCALBIN)" && bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION))); \
+		bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); \
 	}
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
