@@ -21,6 +21,8 @@ package api
 
 import (
 	"bufio"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"net"
@@ -208,17 +210,30 @@ func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request
 	}
 }
 
-// clientMetricLabel returns a stable pseudonym for the client of the given
-// remote address. The address itself is not used, so that metrics exported to
-// Prometheus and rendered in Grafana can still be broken down per client
-// without carrying the client's network identity.
+// clientLabelKey keys the pseudonyms in the exported client labels. It is
+// generated once per process, so that the labels cannot be mapped back to the
+// addresses they were derived from by anyone reading the metrics.
+var clientLabelKey = func() []byte {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		panic(err)
+	}
+	return key
+}()
+
+// clientMetricLabel returns a pseudonym for the client of the given remote
+// address, stable for the lifetime of the process. The address itself is not
+// used, so that metrics exported to Prometheus and rendered in Grafana can
+// still be broken down per client without carrying the client's network
+// identity.
 func clientMetricLabel(remoteAddr string) string {
 	host := remoteAddr
 	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
 		host = h
 	}
-	sum := sha256.Sum256([]byte(host))
-	return hex.EncodeToString(sum[:8])
+	mac := hmac.New(sha256.New, clientLabelKey)
+	mac.Write([]byte(host))
+	return hex.EncodeToString(mac.Sum(nil)[:8])
 }
 
 func isDisplayWebsocket(path string) bool {
