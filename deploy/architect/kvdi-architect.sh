@@ -4,6 +4,7 @@
 export INSTALL_K3S_SKIP_START="true"
 export INSTALL_K3S_EXEC="server --disable traefik"
 export INSTALL_K3S_VERSION="v1.28.15+k3s1"
+# Refresh the checksum when changing the version embedded in the installer URL.
 export K3S_INSTALL_URL="https://raw.githubusercontent.com/k3s-io/k3s/${INSTALL_K3S_VERSION}/install.sh"
 export K3S_INSTALL_SHA256="5f785120f00ef4b0aba205161232d2a04b6e7a75332cae7059fcc1f517340777"
 export PROMETHEUS_OPERATOR_VERSION="v0.41.0"

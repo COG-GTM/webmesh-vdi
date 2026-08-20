@@ -73,6 +73,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 KUSTOMIZE_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/kubernetes-sigs/kustomize/kustomize/$(KUSTOMIZE_VERSION)/hack/install_kustomize.sh
+# Refresh the checksum when changing the version embedded in the installer URL.
 KUSTOMIZE_INSTALL_SHA256 ?= f0d2b3026bfbfb935f413b65c82307049dfcb3286a0a49a62427a8d2c117cdd8
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
@@ -246,6 +247,7 @@ push-proxy: build-proxy
 GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
 GOLANGCI_VERSION ?= v1.53.3
 GOLANGCI_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_VERSION)/install.sh
+# Refresh the checksum when changing the version embedded in the installer URL.
 GOLANGCI_INSTALL_SHA256 ?= 060f1f3deb31b3d3b9515d691d9a776354cd63c7fcb5e036f18f0444cf2c934b
 $(GOLANGCI_LINT):
 	TMP_DIR=$$(mktemp -d) && \
