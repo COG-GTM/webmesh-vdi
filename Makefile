@@ -151,7 +151,7 @@ build-manager:
 ## make build-app          # Build the app docker image.
 build-app:
 	VERSION=$(VERSION) $(GORELEASER) build --single-target --id app $(BUILD_ARGS)
-	cd ui/app && yarn install && quasar build
+	cd ui/app && yarn install --frozen-lockfile && quasar build
 	docker build . \
 		-f build/Dockerfile.app \
 		-t $(APP_IMAGE) \
