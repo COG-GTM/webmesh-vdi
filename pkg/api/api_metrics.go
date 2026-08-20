@@ -21,6 +21,8 @@ package api
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"net"
 	"net/http"
 	"strconv"
@@ -182,7 +184,7 @@ func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) 
 
 func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) {
 	path := apiutil.GetGorillaPath(r)
-	w.clientAddr = strings.Split(r.RemoteAddr, ":")[0]
+	w.clientAddr = clientMetricLabel(r.RemoteAddr)
 	w.desktopName = apiutil.GetNamespacedNameFromRequest(r).String()
 	if isDisplayWebsocket(path) {
 		// this is a display connection
@@ -204,6 +206,19 @@ func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request
 		// this was an audio connection
 		activeAudioStreams.Dec()
 	}
+}
+
+// clientMetricLabel returns a stable pseudonym for the client of the given
+// remote address. The address itself is not used, so that metrics exported to
+// Prometheus and rendered in Grafana can still be broken down per client
+// without carrying the client's network identity.
+func clientMetricLabel(remoteAddr string) string {
+	host := remoteAddr
+	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		host = h
+	}
+	sum := sha256.Sum256([]byte(host))
+	return hex.EncodeToString(sum[:8])
 }
 
 func isDisplayWebsocket(path string) bool {
