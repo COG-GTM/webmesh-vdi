@@ -288,16 +288,24 @@ export default {
     },
 
     onDownloadProgress (ev) {
-      this.downloadIndeterminate = false
       const current = ev.loaded
       let total
       if (ev.lengthComputable) {
         total = ev.total
       } else {
-        const contentLength = ev.target.getResponseHeader('x-decompressed-content-length')
+        // axios 1.x nests the native XHR ProgressEvent under `event`; axios 0.21 passed it directly.
+        const xhr = (ev.event && ev.event.target) || ev.target
+        const contentLength = xhr && xhr.getResponseHeader
+          ? xhr.getResponseHeader('x-decompressed-content-length')
+          : null
         total = parseInt(contentLength, 10)
       }
-      this.downloadProgress = (current / total).toFixed(4)
+      if (Number.isFinite(total) && total > 0) {
+        this.downloadIndeterminate = false
+        this.downloadProgress = (current / total).toFixed(4)
+      } else {
+        this.downloadIndeterminate = true
+      }
     },
 
     async fetchNode (node) {
@@ -331,11 +339,13 @@ export default {
         const errMsg = await getErrorMessage(err)
         this.handleError(new Error(`Failed to download ${path.basename(fpath)}: ${errMsg}`))
 
+        this.downloadIndeterminate = false
         this.downloaded = false
         this.downloading = false
         return
       }
 
+      this.downloadIndeterminate = false
       this.downloadProgress = 1
       this.downloading = false
       this.downloaded = true
