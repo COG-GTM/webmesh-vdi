@@ -20,14 +20,21 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <iframe class="iframe-container" :src="grafanaURL" />
     </div>
   </q-page>
 </template>
 
 <script>
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+  computed: {
+    grafanaURL () {
+      // The token is passed as a query argument, the API sets a cookie scoped
+      // to the proxy so grafana's own requests are authenticated as well.
+      return `/api/grafana/?orgId=1&refresh=5s&kiosk=tv&token=${this.$userStore.getters.token}`
+    }
+  }
 }
 </script>
 
