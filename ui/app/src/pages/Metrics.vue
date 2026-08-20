@@ -62,9 +62,11 @@ export default {
       if (!this.$userStore.getters.renewable) {
         return
       }
+      let failed = false
       try {
         await this.$userStore.dispatch('refreshToken', { background: true })
       } catch (err) {
+        failed = true
         console.error(err)
       }
       // The page may have been left while the renewal was in flight, in which
@@ -72,7 +74,9 @@ export default {
       if (this.stopped) {
         return
       }
-      this.timer = setTimeout(this.refresh, this.nextDelay())
+      // A renewal that keeps failing is not going to start working within half
+      // a token lifetime, so retries are spaced out instead.
+      this.timer = setTimeout(this.refresh, failed ? fallbackDelay : this.nextDelay())
     },
 
     // nextDelay renews halfway through the remaining lifetime of the token, so
