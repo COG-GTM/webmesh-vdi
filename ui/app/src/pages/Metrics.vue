@@ -26,8 +26,36 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 </template>
 
 <script>
+// The dashboard is authenticated by the session cookie issued with the access
+// token, and its requests do not go through axios, so nothing renews the
+// session while the page sits open. Renew it on a timer instead, otherwise the
+// dashboard starts returning forbidden once the access token expires.
+const refreshInterval = 5 * 60 * 1000
+
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+
+  mounted () {
+    this.refresh()
+    this.timer = setInterval(this.refresh, refreshInterval)
+  },
+
+  beforeDestroy () {
+    clearInterval(this.timer)
+  },
+
+  methods: {
+    async refresh () {
+      if (!this.$userStore.getters.renewable) {
+        return
+      }
+      try {
+        await this.$userStore.dispatch('refreshToken')
+      } catch (err) {
+        console.error(err)
+      }
+    }
+  }
 }
 </script>
 

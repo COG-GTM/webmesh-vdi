@@ -49,6 +49,28 @@ const SessionCookie = "sessionToken"
 // EmbeddedContentPath is the path prefix serving content embedded in the UI.
 const EmbeddedContentPath = "/api/grafana"
 
+// newSessionCookie returns the cookie authenticating embedded content with the
+// given session token.
+func newSessionCookie(token string, expires time.Time) *http.Cookie {
+	return &http.Cookie{
+		Name:     SessionCookie,
+		Value:    token,
+		Path:     EmbeddedContentPath,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  expires,
+	}
+}
+
+// expiredSessionCookie returns a cookie that expires the embedded content
+// session cookie in the browser.
+func expiredSessionCookie() *http.Cookie {
+	cookie := newSessionCookie("", time.Time{})
+	cookie.MaxAge = -1
+	return cookie
+}
+
 // returnNewJWT will return a new JSON web token to the requestor.
 func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResult, authorized bool, state string) {
 	// fetch the JWT signing secret
@@ -63,21 +85,6 @@ func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResul
 	if err != nil {
 		apiutil.ReturnAPIError(err, w)
 		return
-	}
-
-	if authorized {
-		// Set a Secure, HttpOnly cookie scoped to the embedded content routes, so
-		// that iframed content can be authenticated without the token being
-		// readable by the browser or sent to any other route.
-		http.SetCookie(w, &http.Cookie{
-			Name:     SessionCookie,
-			Value:    newToken,
-			Path:     EmbeddedContentPath,
-			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteStrictMode,
-			Expires:  time.Unix(claims.ExpiresAt, 0),
-		})
 	}
 
 	if authorized && !result.RefreshNotSupported {
@@ -95,6 +102,16 @@ func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResul
 			HttpOnly: true,
 			Secure:   true,
 		})
+	}
+
+	if authorized {
+		// Set a Secure, HttpOnly cookie scoped to the embedded content routes, so
+		// that iframed content can be authenticated without the token being
+		// readable by the browser or sent to any other route.
+		http.SetCookie(w, newSessionCookie(newToken, time.Unix(claims.ExpiresAt, 0)))
+	} else {
+		// Expire any cookie left over from a previous authorized session.
+		http.SetCookie(w, expiredSessionCookie())
 	}
 
 	// return the token to the user
