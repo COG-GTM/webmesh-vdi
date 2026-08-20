@@ -98,7 +98,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 		trap 'rm -rf "$$TMP_DIR"' EXIT && \
 		curl -SsL -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)" && \
 		$(call verify-sha256,$(KUSTOMIZE_INSTALL_SHA256),$$TMP_DIR/install_kustomize.sh) && \
-		bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); \
+		(cd "$(LOCALBIN)" && bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION))); \
 	}
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
