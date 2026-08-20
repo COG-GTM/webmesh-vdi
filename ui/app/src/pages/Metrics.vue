@@ -20,14 +20,28 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <iframe v-if="sessionReady" class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
     </div>
   </q-page>
 </template>
 
 <script>
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+  data () {
+    return { sessionReady: false }
+  },
+  async mounted () {
+    // Grafana loads its own assets and issues its own XHRs, none of which can
+    // set the session header. This request authenticates with the header and
+    // the API replies with a cookie scoped to the proxy that they can use.
+    try {
+      await this.$axios.get('/api/grafana/api/health')
+      this.sessionReady = true
+    } catch (err) {
+      this.$root.$emit('notify-error', err)
+    }
+  }
 }
 </script>
 
