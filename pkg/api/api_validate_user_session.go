@@ -21,10 +21,16 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
 )
+
+// websocketPathPrefix is the path prefix for websocket routes. These are the
+// only routes allowed to pass the session token as a query parameter, since
+// noVNC cannot set request headers.
+const websocketPathPrefix = "/api/desktops/ws/"
 
 // ValidateUserSession retrieves the JWT token from the X-Session-Token and
 // verifies that it is valid.
@@ -33,9 +39,10 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		// get the auth token
 		var authToken string
 
-		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			// the websocket route does not receive request headers from noVNC, so the token is passed
-			// as a query argument. This effectively gives that option to all routes.
+		if authToken = r.Header.Get(TokenHeader); authToken == "" && strings.HasPrefix(r.URL.Path, websocketPathPrefix) {
+			// the websocket routes do not receive request headers from noVNC, so the token
+			// is passed as a query argument on those routes only. Accepting it anywhere else
+			// would leak credentials into proxy and ingress access logs.
 			if keys, ok := r.URL.Query()["token"]; ok {
 				authToken = keys[0]
 			}
