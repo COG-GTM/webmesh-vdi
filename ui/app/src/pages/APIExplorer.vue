@@ -80,9 +80,6 @@ export default {
         },
         presets: [
           SwaggerUIBundle.presets.apis
-        ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
         ]
       })
       if (this.$userStore.getters.isLoggedIn) {
