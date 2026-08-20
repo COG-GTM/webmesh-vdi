@@ -13,11 +13,11 @@ export K3S_MANIFEST_DIR="/var/lib/rancher/k3s/server/manifests"
 # via the above variables.
 function install-k3s() {
     echo "[INFO]  K3s will be installed to your system"
-    tmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'kvdi-k3s')
-    trap "rm -rf ${tmpdir}" RETURN
+    tmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'kvdi-k3s') || return 1
+    trap "rm -rf ${tmpdir}" RETURN || return 1
 
-    curl -sfL -o "${tmpdir}/install-k3s.sh" "${K3S_INSTALL_URL}"
-    echo "${K3S_INSTALL_SHA256}  ${tmpdir}/install-k3s.sh" | sha256sum -c -
+    curl -sfL -o "${tmpdir}/install-k3s.sh" "${K3S_INSTALL_URL}" || return 1
+    echo "${K3S_INSTALL_SHA256}  ${tmpdir}/install-k3s.sh" | sha256sum -c - || return 1
     bash "${tmpdir}/install-k3s.sh"
 }
 

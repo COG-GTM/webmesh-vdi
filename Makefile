@@ -82,10 +82,10 @@ $(KUSTOMIZE): $(LOCALBIN)
 		rm -rf $(LOCALBIN)/kustomize; \
 	fi
 	test -s $(LOCALBIN)/kustomize || { \
-		TMP_DIR=$$(mktemp -d); \
-		trap 'rm -rf "$$TMP_DIR"' EXIT; \
-		curl -SsL -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)"; \
-		echo "$(KUSTOMIZE_INSTALL_SHA256)  $$TMP_DIR/install_kustomize.sh" | sha256sum -c -; \
+		TMP_DIR=$$(mktemp -d) && \
+		trap 'rm -rf "$$TMP_DIR"' EXIT && \
+		curl -SsL -o "$$TMP_DIR/install_kustomize.sh" "$(KUSTOMIZE_INSTALL_SCRIPT)" && \
+		echo "$(KUSTOMIZE_INSTALL_SHA256)  $$TMP_DIR/install_kustomize.sh" | sha256sum -c - && \
 		bash "$$TMP_DIR/install_kustomize.sh" $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); \
 	}
 
@@ -248,10 +248,10 @@ GOLANGCI_VERSION ?= v1.53.3
 GOLANGCI_INSTALL_SCRIPT ?= https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_VERSION)/install.sh
 GOLANGCI_INSTALL_SHA256 ?= 060f1f3deb31b3d3b9515d691d9a776354cd63c7fcb5e036f18f0444cf2c934b
 $(GOLANGCI_LINT):
-	TMP_DIR=$$(mktemp -d); \
-	trap 'rm -rf "$$TMP_DIR"' EXIT; \
-	curl -sSfL -o "$$TMP_DIR/install.sh" "$(GOLANGCI_INSTALL_SCRIPT)"; \
-	echo "$(GOLANGCI_INSTALL_SHA256)  $$TMP_DIR/install.sh" | sha256sum -c -; \
+	TMP_DIR=$$(mktemp -d) && \
+	trap 'rm -rf "$$TMP_DIR"' EXIT && \
+	curl -sSfL -o "$$TMP_DIR/install.sh" "$(GOLANGCI_INSTALL_SCRIPT)" && \
+	echo "$(GOLANGCI_INSTALL_SHA256)  $$TMP_DIR/install.sh" | sha256sum -c - && \
 	sh "$$TMP_DIR/install.sh" -b $(GOBIN) $(GOLANGCI_VERSION)
 
 ## make lint   # Lint files
