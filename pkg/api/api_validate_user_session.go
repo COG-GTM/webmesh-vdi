@@ -62,7 +62,7 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		}
 
 		// let requests to authorize a token with mfa to go through
-		if !session.Authorized && apiutil.GetGorillaPath(r) != "/api/authorize" && r.Method != http.MethodPost {
+		if !session.Authorized && !isMFAAuthorizeRequest(r) {
 			apiutil.ReturnAPIForbidden(nil, "User session is not authorized", w)
 			return
 		}
@@ -73,4 +73,10 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		// serve the next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isMFAAuthorizeRequest returns true if the request is the MFA authorization
+// request itself, which is the only route an unauthorized session may reach.
+func isMFAAuthorizeRequest(r *http.Request) bool {
+	return apiutil.GetGorillaPath(r) == "/api/authorize" && r.Method == http.MethodPost
 }
