@@ -56,7 +56,7 @@ jobs:
             ui/app/node_modules
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           registry: ghcr.io
@@ -64,25 +64,25 @@ jobs:
           password: ${{ github.token }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.ARCHS }}
 
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Setup Cosign
-        uses: sigstore/cosign-installer@main
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
 
       - name: Run Snapshot Container Release
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@5742e2a039330cbb23ebf35f046f814d4c6ff811 # v5
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
           args: build --snapshot --clean ${{ env.BUILD_IDS }}
 
       - name: Run Container Release
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@5742e2a039330cbb23ebf35f046f814d4c6ff811 # v5
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
@@ -95,7 +95,7 @@ jobs:
           cd ui/app && yarn install && quasar build
 
       - name: Build and Push Manager Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         id: manager-build
         with:
           context: .
@@ -105,7 +105,7 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
 
       - name: Build and Push App Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         id: app-build
         with:
           context: .
@@ -115,7 +115,7 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
 
       - name: Build and Push Proxy Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         id: proxy-build
         with:
           context: .
