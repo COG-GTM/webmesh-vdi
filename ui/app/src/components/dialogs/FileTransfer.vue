@@ -288,7 +288,6 @@ export default {
     },
 
     onDownloadProgress (ev) {
-      this.downloadIndeterminate = false
       const current = ev.loaded
       let total
       if (ev.lengthComputable) {
@@ -301,7 +300,12 @@ export default {
           : null
         total = parseInt(contentLength, 10)
       }
-      this.downloadProgress = (current / total).toFixed(4)
+      if (Number.isFinite(total) && total > 0) {
+        this.downloadIndeterminate = false
+        this.downloadProgress = (current / total).toFixed(4)
+      } else {
+        this.downloadIndeterminate = true
+      }
     },
 
     async fetchNode (node) {
