@@ -25,8 +25,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/go-logr/logr"
@@ -43,10 +44,14 @@ import (
 // authentication backend. Access to groups provided in the claims is supplied
 // through annotations on VDIRoles.
 type AuthProvider struct {
-	metadataURL string
+	validateURL string
 	cluster     *appv1.VDICluster
 	client      client.Client
+	httpClient  *http.Client
 }
+
+// metadataRequestTimeout bounds requests to the metadata service.
+const metadataRequestTimeout = time.Second * 10
 
 // New returns a new AuthProvider.
 func New() *AuthProvider {
@@ -61,10 +66,36 @@ func (a *AuthProvider) Reconcile(context.Context, logr.Logger, client.Client, *a
 // Setup is called when the kVDI app launches and is a chance for the provider
 // to setup any resources it needs to serve requests.
 func (a *AuthProvider) Setup(cli client.Client, cluster *appv1.VDICluster) error {
-	a.metadataURL = cluster.Spec.Auth.WebmeshAuth.MetadataURL
+	validateURL, err := getValidateURL(cluster.Spec.Auth.WebmeshAuth.MetadataURL)
+	if err != nil {
+		return err
+	}
+	a.validateURL = validateURL
 	a.cluster = cluster
 	a.client = cli
+	a.httpClient = &http.Client{Timeout: metadataRequestTimeout}
 	return nil
+}
+
+// getValidateURL builds the token validation endpoint from the configured
+// metadata URL. User credentials are forwarded to this endpoint, so it is only
+// accepted over HTTPS.
+func getValidateURL(metadataURL string) (string, error) {
+	parsed, err := url.Parse(metadataURL)
+	if err != nil {
+		return "", fmt.Errorf("could not parse webmesh metadataURL: %w", err)
+	}
+	if parsed.Scheme != "https" {
+		return "", fmt.Errorf("webmesh metadataURL must use https, got %q", metadataURL)
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("webmesh metadataURL must include a host, got %q", metadataURL)
+	}
+	validateURL, err := url.JoinPath(metadataURL, "id-tokens", "validate")
+	if err != nil {
+		return "", fmt.Errorf("could not build webmesh validation URL: %w", err)
+	}
+	return validateURL, nil
 }
 
 // Close is called after temporary uses of the auth provider. It should close
@@ -86,12 +117,12 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 	if token == "" {
 		return nil, fmt.Errorf("no Authorization header provided")
 	}
-	r, err := http.NewRequest("GET", path.Join(a.metadataURL, "id-tokens", "validate"), nil)
+	r, err := http.NewRequest("GET", a.validateURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	r.Header.Set("Authorization", token)
-	resp, err := http.DefaultClient.Do(r)
+	resp, err := a.httpClient.Do(r)
 	if err != nil {
 		return nil, err
 	}
