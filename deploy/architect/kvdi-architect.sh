@@ -5,9 +5,6 @@ export INSTALL_K3S_SKIP_START="true"
 export INSTALL_K3S_EXEC="server --disable traefik"
 export PROMETHEUS_OPERATOR_VERSION="v0.41.0"
 export K3S_MANIFEST_DIR="/var/lib/rancher/k3s/server/manifests"
-# Pin the k3s release so the installer downloads a fixed, checksum-verified
-# binary instead of whatever "latest" resolves to at run time.
-export INSTALL_K3S_VERSION="${INSTALL_K3S_VERSION:-v1.30.6+k3s1}"
 # Pin the kVDI helm-charts source to an immutable commit SHA instead of the
 # mutable "main" branch, so the fetched chart/index/manifest content cannot
 # change between installs.
