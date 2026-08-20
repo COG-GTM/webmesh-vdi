@@ -67,7 +67,8 @@ const routes = [
       {
         path: 'swagger',
         name: 'swagger',
-        component: APIExplorer
+        component: APIExplorer,
+        meta: { requiresAuth: true }
       },
       {
         path: 'metrics',

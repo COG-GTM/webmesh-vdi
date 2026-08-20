@@ -56,6 +56,27 @@ export default {
     }
   },
   mounted () {
+    // swagger-ui honors top-level url/urls/configUrl/config query params
+    // (parseSearch reads window.location.search and is deep-merged over the
+    // constructor config), which would let a crafted link override the
+    // hardcoded same-origin spec with an attacker-controlled one. Strip those
+    // params from the URL before initializing so only /swagger.json can load.
+    const params = new URLSearchParams(window.location.search)
+    let stripped = false
+    for (const key of ['url', 'urls', 'configUrl', 'config']) {
+      if (params.has(key)) {
+        params.delete(key)
+        stripped = true
+      }
+    }
+    if (stripped) {
+      const query = params.toString()
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+      )
+    }
     this.$nextTick().then(() => {
       this.ui = SwaggerUIBundle({
         url: '/swagger.json',
@@ -80,9 +101,6 @@ export default {
         },
         presets: [
           SwaggerUIBundle.presets.apis
-        ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
         ]
       })
       if (this.$userStore.getters.isLoggedIn) {
