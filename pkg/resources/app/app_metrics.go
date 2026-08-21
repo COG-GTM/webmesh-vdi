@@ -25,7 +25,6 @@ import (
 
 	appv1 "github.com/kvdi/kvdi/apis/app/v1"
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
-	"github.com/kvdi/kvdi/pkg/util/tlsutil"
 
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -99,7 +98,7 @@ func newAppServiceMonitorForCR(instance *appv1.VDICluster) *promv1.ServiceMonito
 									Key: "ca.crt",
 								},
 							},
-							ServerName: tlsutil.DNSNames(instance.GetAppName(), instance.GetCoreNamespace())[2],
+							ServerName: fmt.Sprintf("%s.%s.svc", instance.GetAppName(), instance.GetCoreNamespace()),
 						},
 					},
 				},
