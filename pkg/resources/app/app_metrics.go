@@ -64,6 +64,22 @@ func newGrafanaConfigForCR(instance *appv1.VDICluster) *corev1.ConfigMap {
 }
 
 func newAppServiceMonitorForCR(instance *appv1.VDICluster) *promv1.ServiceMonitor {
+	tlsConfig := &promv1.TLSConfig{}
+	if instance.AppIsUsingExternalServerTLS() {
+		// External certificates are not signed by the operator CA and may not include service DNS names.
+		tlsConfig.InsecureSkipVerify = true
+	} else {
+		tlsConfig.CA = promv1.SecretOrConfigMap{
+			Secret: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: instance.GetAppServerTLSSecretName(),
+				},
+				Key: "ca.crt",
+			},
+		}
+		tlsConfig.ServerName = fmt.Sprintf("%s.%s.svc", instance.GetAppName(), instance.GetCoreNamespace())
+	}
+
 	return &promv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            instance.GetAppName(),
@@ -84,23 +100,11 @@ func newAppServiceMonitorForCR(instance *appv1.VDICluster) *promv1.ServiceMonito
 			},
 			Endpoints: []promv1.Endpoint{
 				{
-					Port:     "web",
-					Path:     "/api/metrics",
-					Interval: "10s",
-					Scheme:   "https",
-					TLSConfig: &promv1.TLSConfig{
-						SafeTLSConfig: promv1.SafeTLSConfig{
-							CA: promv1.SecretOrConfigMap{
-								Secret: &corev1.SecretKeySelector{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: instance.GetAppServerTLSSecretName(),
-									},
-									Key: "ca.crt",
-								},
-							},
-							ServerName: fmt.Sprintf("%s.%s.svc", instance.GetAppName(), instance.GetCoreNamespace()),
-						},
-					},
+					Port:      "web",
+					Path:      "/api/metrics",
+					Interval:  "10s",
+					Scheme:    "https",
+					TLSConfig: tlsConfig,
 				},
 			},
 		},
