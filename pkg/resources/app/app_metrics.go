@@ -25,6 +25,7 @@ import (
 
 	appv1 "github.com/kvdi/kvdi/apis/app/v1"
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
+	"github.com/kvdi/kvdi/pkg/util/tlsutil"
 
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -90,7 +91,15 @@ func newAppServiceMonitorForCR(instance *appv1.VDICluster) *promv1.ServiceMonito
 					Scheme:   "https",
 					TLSConfig: &promv1.TLSConfig{
 						SafeTLSConfig: promv1.SafeTLSConfig{
-							InsecureSkipVerify: true,
+							CA: promv1.SecretOrConfigMap{
+								Secret: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: instance.GetAppServerTLSSecretName(),
+									},
+									Key: "ca.crt",
+								},
+							},
+							ServerName: tlsutil.DNSNames(instance.GetAppName(), instance.GetCoreNamespace())[2],
 						},
 					},
 				},
