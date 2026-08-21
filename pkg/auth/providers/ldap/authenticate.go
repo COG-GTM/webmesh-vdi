@@ -55,7 +55,7 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 	searchRequest := ldapv3.NewSearchRequest(
 		a.getUserBase(),
 		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf(a.userFilter(), req.Username),
+		fmt.Sprintf(a.userFilter(), ldapv3.EscapeFilter(req.Username)),
 		a.userAttrs(),
 		nil,
 	)

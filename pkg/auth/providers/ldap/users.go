@@ -65,7 +65,7 @@ func (a *AuthProvider) GetUsers() ([]*types.VDIUser, error) {
 					searchRequest := ldapv3.NewSearchRequest(
 						a.getUserBase(),
 						ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-						fmt.Sprintf(a.groupUsersFilter(), group),
+						fmt.Sprintf(a.groupUsersFilter(), ldapv3.EscapeFilter(group)),
 						a.userAttrs(),
 						nil,
 					)
@@ -106,7 +106,7 @@ func (a *AuthProvider) GetUser(username string) (*types.VDIUser, error) {
 	searchRequest := ldapv3.NewSearchRequest(
 		a.getUserBase(),
 		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf(a.userFilter(), username),
+		fmt.Sprintf(a.userFilter(), ldapv3.EscapeFilter(username)),
 		a.userAttrs(),
 		nil,
 	)
