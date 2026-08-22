@@ -21,6 +21,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
@@ -47,7 +48,7 @@ func (d *desktopAPI) GetGrafanaToken(w http.ResponseWriter, r *http.Request) {
 		Path:     GrafanaProxyPath,
 		Expires:  time.Unix(session.ExpiresAt, 0),
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteStrictMode,
 	})
 	apiutil.WriteJSON(map[string]bool{"ok": true}, w)
@@ -85,6 +86,15 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// requestIsHTTPS returns whether the browser reached the API over HTTPS,
+// accounting for a TLS terminating proxy in front of the pod.
+func requestIsHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 // grafanaTokenFromRequest returns the access token in the request.

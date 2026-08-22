@@ -93,7 +93,10 @@ func (d *desktopAPI) buildRouter() error {
 		res.Header.Set("X-Frame-Options", "SAMEORIGIN")
 		return nil
 	}
-	r.PathPrefix(GrafanaProxyPath).Handler(d.ValidateGrafanaSession(grafanaProxy))
+	// Registered on the exact path and the trailing slash prefix so the prefix
+	// does not swallow sibling routes such as /api/grafana_token.
+	r.Path(GrafanaProxyPath).Handler(d.ValidateGrafanaSession(grafanaProxy))
+	r.PathPrefix(GrafanaProxyPath + "/").Handler(d.ValidateGrafanaSession(grafanaProxy))
 
 	// Login route is not protected since it generates the tokens for which a user
 	// can use the protected routes.
