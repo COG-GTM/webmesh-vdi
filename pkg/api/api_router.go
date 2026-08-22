@@ -82,8 +82,8 @@ func (d *desktopAPI) buildRouter() error {
 	r.PathPrefix("/api/healthz").HandlerFunc(d.Healthz).Methods("GET")
 	r.PathPrefix("/api/readyz").HandlerFunc(d.Readyz).Methods("GET")
 
-	// Grafana proxy - requires an authorized user session with permission to
-	// read the cluster metrics.
+	// Grafana proxy - requires an authorized user session. Any authenticated
+	// user may view the dashboards.
 	grafanaProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",
@@ -120,6 +120,7 @@ func (d *desktopAPI) buildRouter() error {
 	protected.HandleFunc("/logout", d.PostLogout).Methods("POST")                             // Cleans up user's desktops
 	protected.HandleFunc("/whoami", d.GetWhoAmI).Methods("GET")                               // Convenience route for decoding JWTs
 	protected.HandleFunc("/config", d.GetConfig).Methods("GET")                               // Retrieve server configuration
+	protected.HandleFunc("/grafana_token", d.GetGrafanaToken).Methods("GET")                  // Exchange the session token for a cookie scoped to the Grafana proxy
 	protected.HandleFunc("/namespaces", d.GetNamespaces).Methods("GET")                       // Retrieve a list of available namespaces for the requesting user
 	protected.HandleFunc("/serviceaccounts/{namespace}", d.GetServiceAccounts).Methods("GET") // Retrieve a list of available service accounts for the requesting user
 

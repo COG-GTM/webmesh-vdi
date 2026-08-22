@@ -36,13 +36,29 @@ const GrafanaTokenCookie = "grafanaToken"
 // GrafanaProxyPath is the path the Grafana sidecar is proxied on.
 const GrafanaProxyPath = "/api/grafana"
 
+// GetGrafanaToken exchanges the caller's session token for a cookie scoped to
+// the Grafana proxy. It is served from a protected route, so the token arrives
+// in the session token header and is never placed in a URL.
+func (d *desktopAPI) GetGrafanaToken(w http.ResponseWriter, r *http.Request) {
+	session := apiutil.GetRequestUserSession(r)
+	http.SetCookie(w, &http.Cookie{
+		Name:     GrafanaTokenCookie,
+		Value:    r.Header.Get(TokenHeader),
+		Path:     GrafanaProxyPath,
+		Expires:  time.Unix(session.ExpiresAt, 0),
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+	apiutil.WriteJSON(map[string]bool{"ok": true}, w)
+}
+
 // ValidateGrafanaSession requires an authorized user session before a request
-// is proxied to the Grafana sidecar. The token may be supplied in the session
-// token header, in a token query argument, or in the cookie set by this
-// middleware when a token is provided by query argument.
+// is proxied to the Grafana sidecar. The token is read from the cookie issued
+// by GetGrafanaToken, or from the session token header for API clients.
 func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authToken, fromQuery := grafanaTokenFromRequest(r)
+		authToken := grafanaTokenFromRequest(r)
 		if authToken == "" {
 			apiutil.ReturnAPIForbidden(nil, "No token provided in request", w)
 			return
@@ -65,37 +81,19 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 			return
 		}
 
-		if fromQuery {
-			// Hand the token back as a cookie scoped to the proxy so that the
-			// requests Grafana makes on its own are authenticated as well.
-			http.SetCookie(w, &http.Cookie{
-				Name:     GrafanaTokenCookie,
-				Value:    authToken,
-				Path:     GrafanaProxyPath,
-				Expires:  time.Unix(session.ExpiresAt, 0),
-				HttpOnly: true,
-				Secure:   r.TLS != nil,
-				SameSite: http.SameSiteStrictMode,
-			})
-		}
-
 		apiutil.SetRequestUserSession(r, session)
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-// grafanaTokenFromRequest returns the access token in the request and whether
-// it was provided as a query argument.
-func grafanaTokenFromRequest(r *http.Request) (token string, fromQuery bool) {
-	if token = r.Header.Get(TokenHeader); token != "" {
-		return token, false
+// grafanaTokenFromRequest returns the access token in the request.
+func grafanaTokenFromRequest(r *http.Request) string {
+	if token := r.Header.Get(TokenHeader); token != "" {
+		return token
 	}
-	if keys, ok := r.URL.Query()["token"]; ok && keys[0] != "" {
-		return keys[0], true
+	if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
+		return cookie.Value
 	}
-	if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil && cookie != nil {
-		return cookie.Value, false
-	}
-	return "", false
+	return ""
 }
