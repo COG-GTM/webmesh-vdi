@@ -20,14 +20,45 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <iframe v-if="authorized" class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
     </div>
   </q-page>
 </template>
 
 <script>
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+
+  data () {
+    return {
+      authorized: false
+    }
+  },
+
+  computed: {
+    token () { return this.$userStore.getters.token }
+  },
+
+  watch: {
+    // Reissue the proxy cookie when the access token is refreshed so the
+    // dashboards keep loading for the life of the session.
+    token () { this.authorizeGrafana() }
+  },
+
+  async mounted () {
+    await this.authorizeGrafana()
+  },
+
+  methods: {
+    async authorizeGrafana () {
+      try {
+        await this.$axios.get('/api/grafana_token')
+        this.authorized = true
+      } catch (err) {
+        this.$root.$emit('notify-error', err)
+      }
+    }
+  }
 }
 </script>
 

@@ -82,18 +82,21 @@ func (d *desktopAPI) buildRouter() error {
 	r.PathPrefix("/api/healthz").HandlerFunc(d.Healthz).Methods("GET")
 	r.PathPrefix("/api/readyz").HandlerFunc(d.Readyz).Methods("GET")
 
-	// Grafana proxy - This is unprotected for now, but should figure out what
-	// permission model would work well for it. It doesn't fit well into the existing
-	// paradigms.
+	// Grafana proxy - requires an authorized user session. Any authenticated
+	// user may view the dashboards.
 	grafanaProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",
 	})
 	grafanaProxy.ModifyResponse = func(res *http.Response) error {
-		res.Header.Del("X-Frame-Options")
+		// Allow the dashboards to be framed by the kvdi app itself only.
+		res.Header.Set("X-Frame-Options", "SAMEORIGIN")
 		return nil
 	}
-	r.PathPrefix("/api/grafana").Handler(grafanaProxy)
+	// Registered on the exact path and the trailing slash prefix so the prefix
+	// does not swallow sibling routes such as /api/grafana_token.
+	r.Path(GrafanaProxyPath).Handler(d.ValidateGrafanaSession(grafanaProxy))
+	r.PathPrefix(GrafanaProxyPath + "/").Handler(d.ValidateGrafanaSession(grafanaProxy))
 
 	// Login route is not protected since it generates the tokens for which a user
 	// can use the protected routes.
@@ -120,6 +123,7 @@ func (d *desktopAPI) buildRouter() error {
 	protected.HandleFunc("/logout", d.PostLogout).Methods("POST")                             // Cleans up user's desktops
 	protected.HandleFunc("/whoami", d.GetWhoAmI).Methods("GET")                               // Convenience route for decoding JWTs
 	protected.HandleFunc("/config", d.GetConfig).Methods("GET")                               // Retrieve server configuration
+	protected.HandleFunc("/grafana_token", d.GetGrafanaToken).Methods("GET")                  // Exchange the session token for a cookie scoped to the Grafana proxy
 	protected.HandleFunc("/namespaces", d.GetNamespaces).Methods("GET")                       // Retrieve a list of available namespaces for the requesting user
 	protected.HandleFunc("/serviceaccounts/{namespace}", d.GetServiceAccounts).Methods("GET") // Retrieve a list of available service accounts for the requesting user
 
