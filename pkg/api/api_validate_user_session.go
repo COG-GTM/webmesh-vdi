@@ -30,6 +30,9 @@ import (
 // on requests the Grafana dashboards make for their own assets.
 const GrafanaTokenCookie = "kvdi-grafana-token"
 
+// GrafanaProxyPath is the path prefix the Grafana dashboards are served from.
+const GrafanaProxyPath = "/api/grafana"
+
 // getRequestToken extracts the session token from the request headers or, when
 // absent, the token query argument.
 func getRequestToken(r *http.Request) string {
@@ -44,23 +47,21 @@ func getRequestToken(r *http.Request) string {
 	return ""
 }
 
-// ValidateGrafanaSession requires a valid session on the Grafana proxy. The UI
-// loads the dashboards in an iframe with the token in the query arguments, and
-// the assets Grafana requests afterwards carry it in a cookie.
-func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
-	return d.ValidateUserSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token := getRequestToken(r); token != "" {
-			http.SetCookie(w, &http.Cookie{
-				Name:     GrafanaTokenCookie,
-				Value:    token,
-				Path:     "/api/grafana",
-				HttpOnly: true,
-				Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
-				SameSite: http.SameSiteStrictMode,
-			})
-		}
-		next.ServeHTTP(w, r)
-	}))
+// SetGrafanaSessionCookie pins the session token of the request to a cookie
+// scoped to the Grafana proxy. The dashboards are loaded in an iframe and fetch
+// their own assets, and neither can set the session header, so the UI calls this
+// route to authenticate them. It is called again while the page is open to keep
+// the cookie in step with token renewals.
+func (d *desktopAPI) SetGrafanaSessionCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     GrafanaTokenCookie,
+		Value:    getRequestToken(r),
+		Path:     GrafanaProxyPath,
+		HttpOnly: true,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		SameSite: http.SameSiteStrictMode,
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ValidateUserSession retrieves the JWT token from the X-Session-Token and
