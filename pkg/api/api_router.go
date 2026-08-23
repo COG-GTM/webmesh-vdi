@@ -88,6 +88,12 @@ func (d *desktopAPI) buildRouter() error {
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",
 	})
+	grafanaDirector := grafanaProxy.Director
+	grafanaProxy.Director = func(req *http.Request) {
+		grafanaDirector(req)
+		// Grafana has no use for the kvdi session credentials.
+		StripSessionCredentials(req)
+	}
 	grafanaProxy.ModifyResponse = func(res *http.Response) error {
 		// The UI embeds the dashboards from the same origin, so downgrade the
 		// upstream policy instead of dropping it entirely.

@@ -64,6 +64,23 @@ func (d *desktopAPI) SetGrafanaSessionCookie(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// StripSessionCredentials removes the kvdi session token from a request before
+// it is proxied to an upstream that has no business seeing it.
+func StripSessionCredentials(r *http.Request) {
+	r.Header.Del(TokenHeader)
+	if query := r.URL.Query(); query.Has("token") {
+		query.Del("token")
+		r.URL.RawQuery = query.Encode()
+	}
+	cookies := r.Cookies()
+	r.Header.Del("Cookie")
+	for _, cookie := range cookies {
+		if cookie.Name != GrafanaTokenCookie {
+			r.AddCookie(cookie)
+		}
+	}
+}
+
 // ValidateUserSession retrieves the JWT token from the X-Session-Token and
 // verifies that it is valid.
 func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
