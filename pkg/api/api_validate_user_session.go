@@ -21,6 +21,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
@@ -94,7 +95,8 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		// get the auth token
 		authToken := getRequestToken(r)
 
-		if authToken == "" {
+		// the grafana cookie is only honored on the routes it was scoped to
+		if authToken == "" && strings.HasPrefix(r.URL.Path, GrafanaProxyPath) {
 			if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
 				authToken = cookie.Value
 			}
