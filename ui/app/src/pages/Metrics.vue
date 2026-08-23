@@ -41,12 +41,20 @@ export default {
     }
   },
   async mounted () {
-    await this.setGrafanaSession()
+    try {
+      await this.setGrafanaSession()
+    } catch (err) {
+      // The interval retries, and the iframe surfaces the upstream error in the
+      // meantime, which beats rendering nothing at all.
+      console.error(err)
+    }
     if (this.destroyed) {
       return
     }
     this.authenticated = true
-    this.refreshInterval = setInterval(this.setGrafanaSession, sessionRefreshInterval)
+    this.refreshInterval = setInterval(() => {
+      this.setGrafanaSession().catch(console.error)
+    }, sessionRefreshInterval)
   },
   beforeDestroy () {
     this.destroyed = true
