@@ -35,16 +35,21 @@ export default {
   data () {
     return {
       authenticated: false,
+      destroyed: false,
       refreshInterval: null,
       grafanaURL: '/api/grafana/?orgId=1&refresh=5s&kiosk=tv'
     }
   },
   async mounted () {
     await this.setGrafanaSession()
+    if (this.destroyed) {
+      return
+    }
     this.authenticated = true
     this.refreshInterval = setInterval(this.setGrafanaSession, sessionRefreshInterval)
   },
   beforeDestroy () {
+    this.destroyed = true
     clearInterval(this.refreshInterval)
   },
   methods: {
