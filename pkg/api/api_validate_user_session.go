@@ -26,18 +26,53 @@ import (
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
 )
 
+// GrafanaTokenCookie is the name of the cookie used to carry the session token
+// on requests the Grafana dashboards make for their own assets.
+const GrafanaTokenCookie = "kvdi-grafana-token"
+
+// getRequestToken extracts the session token from the request headers or, when
+// absent, the token query argument.
+func getRequestToken(r *http.Request) string {
+	if authToken := r.Header.Get(TokenHeader); authToken != "" {
+		return authToken
+	}
+	// the websocket route does not receive request headers from noVNC, so the token is passed
+	// as a query argument. This effectively gives that option to all routes.
+	if keys, ok := r.URL.Query()["token"]; ok {
+		return keys[0]
+	}
+	return ""
+}
+
+// ValidateGrafanaSession requires a valid session on the Grafana proxy. The UI
+// loads the dashboards in an iframe with the token in the query arguments, and
+// the assets Grafana requests afterwards carry it in a cookie.
+func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
+	return d.ValidateUserSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token := getRequestToken(r); token != "" {
+			http.SetCookie(w, &http.Cookie{
+				Name:     GrafanaTokenCookie,
+				Value:    token,
+				Path:     "/api/grafana",
+				HttpOnly: true,
+				Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+				SameSite: http.SameSiteStrictMode,
+			})
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
 // ValidateUserSession retrieves the JWT token from the X-Session-Token and
 // verifies that it is valid.
 func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get the auth token
-		var authToken string
+		authToken := getRequestToken(r)
 
-		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			// the websocket route does not receive request headers from noVNC, so the token is passed
-			// as a query argument. This effectively gives that option to all routes.
-			if keys, ok := r.URL.Query()["token"]; ok {
-				authToken = keys[0]
+		if authToken == "" {
+			if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
+				authToken = cookie.Value
 			}
 		}
 

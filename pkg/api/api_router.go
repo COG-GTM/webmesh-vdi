@@ -82,18 +82,19 @@ func (d *desktopAPI) buildRouter() error {
 	r.PathPrefix("/api/healthz").HandlerFunc(d.Healthz).Methods("GET")
 	r.PathPrefix("/api/readyz").HandlerFunc(d.Readyz).Methods("GET")
 
-	// Grafana proxy - This is unprotected for now, but should figure out what
-	// permission model would work well for it. It doesn't fit well into the existing
-	// paradigms.
+	// Grafana proxy - Requires a valid session. A granular permission model for
+	// the dashboards themselves doesn't fit well into the existing paradigms.
 	grafanaProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",
 	})
 	grafanaProxy.ModifyResponse = func(res *http.Response) error {
-		res.Header.Del("X-Frame-Options")
+		// The UI embeds the dashboards from the same origin, so downgrade the
+		// upstream policy instead of dropping it entirely.
+		res.Header.Set("X-Frame-Options", "SAMEORIGIN")
 		return nil
 	}
-	r.PathPrefix("/api/grafana").Handler(grafanaProxy)
+	r.PathPrefix("/api/grafana").Handler(d.ValidateGrafanaSession(grafanaProxy))
 
 	// Login route is not protected since it generates the tokens for which a user
 	// can use the protected routes.
