@@ -53,9 +53,15 @@ func getRequestToken(r *http.Request) string {
 // route to authenticate them. It is called again while the page is open to keep
 // the cookie in step with token renewals.
 func (d *desktopAPI) SetGrafanaSessionCookie(w http.ResponseWriter, r *http.Request) {
+	token := getRequestToken(r)
+	if token == "" {
+		// The request authenticated with the cookie already in place, leave it be.
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     GrafanaTokenCookie,
-		Value:    getRequestToken(r),
+		Value:    token,
 		Path:     GrafanaProxyPath,
 		HttpOnly: true,
 		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
