@@ -20,14 +20,51 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <iframe v-if="authenticated" class="iframe-container" :src="grafanaURL" />
     </div>
   </q-page>
 </template>
 
 <script>
+// The dashboards authenticate with a cookie that is kept fresh while the page is
+// open, since the session token behind it is short-lived.
+const sessionRefreshInterval = 60000
+
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+  data () {
+    return {
+      authenticated: false,
+      destroyed: false,
+      refreshInterval: null,
+      grafanaURL: '/api/grafana/?orgId=1&refresh=5s&kiosk=tv'
+    }
+  },
+  async mounted () {
+    try {
+      await this.setGrafanaSession()
+    } catch (err) {
+      // The interval retries, and the iframe surfaces the upstream error in the
+      // meantime, which beats rendering nothing at all.
+      console.error(err)
+    }
+    if (this.destroyed) {
+      return
+    }
+    this.authenticated = true
+    this.refreshInterval = setInterval(() => {
+      this.setGrafanaSession().catch(console.error)
+    }, sessionRefreshInterval)
+  },
+  beforeDestroy () {
+    this.destroyed = true
+    clearInterval(this.refreshInterval)
+  },
+  methods: {
+    async setGrafanaSession () {
+      await this.$axios.post('/api/grafana/session')
+    }
+  }
 }
 </script>
 

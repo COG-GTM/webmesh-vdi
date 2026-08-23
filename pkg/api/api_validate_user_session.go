@@ -21,23 +21,84 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
 )
+
+// GrafanaTokenCookie is the name of the cookie used to carry the session token
+// on requests the Grafana dashboards make for their own assets.
+const GrafanaTokenCookie = "kvdi-grafana-token"
+
+// GrafanaProxyPath is the path prefix the Grafana dashboards are served from.
+const GrafanaProxyPath = "/api/grafana"
+
+// getRequestToken extracts the session token from the request headers or, when
+// absent, the token query argument.
+func getRequestToken(r *http.Request) string {
+	if authToken := r.Header.Get(TokenHeader); authToken != "" {
+		return authToken
+	}
+	// the websocket route does not receive request headers from noVNC, so the token is passed
+	// as a query argument. This effectively gives that option to all routes.
+	if keys, ok := r.URL.Query()["token"]; ok {
+		return keys[0]
+	}
+	return ""
+}
+
+// SetGrafanaSessionCookie pins the session token of the request to a cookie
+// scoped to the Grafana proxy. The dashboards are loaded in an iframe and fetch
+// their own assets, and neither can set the session header, so the UI calls this
+// route to authenticate them. It is called again while the page is open to keep
+// the cookie in step with token renewals.
+func (d *desktopAPI) SetGrafanaSessionCookie(w http.ResponseWriter, r *http.Request) {
+	token := getRequestToken(r)
+	if token == "" {
+		// The request authenticated with the cookie already in place, leave it be.
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     GrafanaTokenCookie,
+		Value:    token,
+		Path:     GrafanaProxyPath,
+		HttpOnly: true,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		SameSite: http.SameSiteStrictMode,
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// StripSessionCredentials removes the kvdi session token from a request before
+// it is proxied to an upstream that has no business seeing it.
+func StripSessionCredentials(r *http.Request) {
+	r.Header.Del(TokenHeader)
+	if query := r.URL.Query(); query.Has("token") {
+		query.Del("token")
+		r.URL.RawQuery = query.Encode()
+	}
+	cookies := r.Cookies()
+	r.Header.Del("Cookie")
+	for _, cookie := range cookies {
+		if cookie.Name != GrafanaTokenCookie {
+			r.AddCookie(cookie)
+		}
+	}
+}
 
 // ValidateUserSession retrieves the JWT token from the X-Session-Token and
 // verifies that it is valid.
 func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get the auth token
-		var authToken string
+		authToken := getRequestToken(r)
 
-		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			// the websocket route does not receive request headers from noVNC, so the token is passed
-			// as a query argument. This effectively gives that option to all routes.
-			if keys, ok := r.URL.Query()["token"]; ok {
-				authToken = keys[0]
+		// the grafana cookie is only honored on the routes it was scoped to
+		if authToken == "" && strings.HasPrefix(r.URL.Path, GrafanaProxyPath) {
+			if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
+				authToken = cookie.Value
 			}
 		}
 
