@@ -20,12 +20,12 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/kvdi/kvdi/pkg/types"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
 )
@@ -58,21 +58,48 @@ func TestSessionQueryTokenRejectedOnNormalRoutes(t *testing.T) {
 }
 
 func TestSessionQueryTokenAllowedOnWebsocketRoutes(t *testing.T) {
-	router := mux.NewRouter()
-	router.Path("/api/desktops/ws/{namespace}/{name}/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !allowsWebsocketQueryToken(r) {
-			t.Error("websocket route was not recognized as allowing query tokens")
-		}
-	})
+	server, addr, _, err := NewTestAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
 
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/api/desktops/ws/default/example/status?token=test-token",
-		nil,
+	_, token, err := apiutil.GenerateJWT(
+		[]byte("supersecret"),
+		&types.AuthResult{User: &types.VDIUser{Name: "admin"}},
+		true,
+		time.Minute,
 	)
-	res := httptest.NewRecorder()
-	router.ServeHTTP(res, req)
-	if res.Code != http.StatusOK {
-		t.Fatalf("websocket route returned status %d", res.Code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.Get(addr + "/api/desktops/ws/default/example/status?token=" + token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "No token provided in request") {
+		t.Fatal("websocket route with a valid query token was rejected by session validation")
+	}
+
+	res, err = http.Get(addr + "/api/desktops/ws/default/example/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("websocket route without a query token returned status %d", res.StatusCode)
+	}
+	body, err = io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "No token provided in request") {
+		t.Fatalf("websocket route without a query token returned unexpected response: %s", body)
 	}
 }
