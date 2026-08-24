@@ -37,25 +37,43 @@ export default {
   data () {
     return {
       loading: true,
-      error: false
+      error: false,
+      grafanaRefreshInterval: null
     }
   },
 
   methods: {
+    async primeGrafanaCookie () {
+      await this.$axios.get('/api/grafana/api/health')
+    },
+
     async loadGrafana () {
       try {
-        await this.$axios.get('/api/grafana/api/health')
+        await this.primeGrafanaCookie()
       } catch (err) {
         this.error = true
         this.$root.$emit('notify-error', err)
       } finally {
         this.loading = false
       }
+    },
+
+    async refreshGrafanaCookie () {
+      try {
+        await this.primeGrafanaCookie()
+      } catch (err) {
+        console.error('Unable to refresh Grafana session cookie', err)
+      }
     }
   },
 
   mounted () {
     this.loadGrafana()
+    this.grafanaRefreshInterval = setInterval(this.refreshGrafanaCookie, 60 * 1000)
+  },
+
+  beforeDestroy () {
+    clearInterval(this.grafanaRefreshInterval)
   }
 }
 </script>
