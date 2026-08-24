@@ -212,6 +212,12 @@ export const UserStore = new Vuex.Store({
           commit('auth_error')
           commit('auth_need_mfa')
           delete Vue.prototype.$axios.defaults.headers.common['X-Session-Token']
+          Vue.prototype.$q.notify({
+            color: 'red-4',
+            textColor: 'black',
+            icon: 'error',
+            message: 'Your session expired; please re-authenticate'
+          })
           return null
         }
         commit('auth_success', { token, renewable })
