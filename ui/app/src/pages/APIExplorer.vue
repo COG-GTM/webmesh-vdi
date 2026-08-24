@@ -65,10 +65,7 @@ export default {
         responseInterceptor: (response) => {
           if (response.status === 401) {
             return this.$userStore.dispatch('refreshToken')
-              .then((token) => {
-                if (token === null) {
-                  return response
-                }
+              .then(() => {
                 response.text = '{"internal": "KVDI: Your access token has been refreshed, please try again"}'
                 response.ok = true
                 return response
