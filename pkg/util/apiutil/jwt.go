@@ -38,9 +38,9 @@ func GenerateJWT(secret []byte, authResult *types.AuthResult, authorized bool, s
 		Data:       authResult.Data,
 		Authorized: authorized,
 		Renewable:  !authResult.RefreshNotSupported,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(sessionLength).Unix(),
-			IssuedAt:  time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(sessionLength)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

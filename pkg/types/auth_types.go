@@ -86,7 +86,7 @@ type JWTClaims struct {
 	// Additional data that was provided by the authentication provider
 	Data map[string]string `json:"data"`
 	// The standard JWT claims
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 // VDIUser represents a user in kVDI. It is the auth providers responsibility
