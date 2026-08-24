@@ -49,7 +49,7 @@ jobs:
       - name: Setup Build Cache
         uses: actions/cache@v3
         with:
-          key: ${{ runner.os }}-build-${{ hashFiles(env.CACHE_DEP_PATH) }}
+          key: ${{ runner.os }}-build-${{ env.GO_VERSION }}-${{ env.NODE_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH, 'ui/app/yarn.lock') }}
           restore-keys: ${{ runner.os }}-build-${{ env.GO_VERSION }}-
           path: |
             ~/go/pkg
