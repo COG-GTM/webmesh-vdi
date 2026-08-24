@@ -63,8 +63,6 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 			return
 		}
 
-		apiutil.SetRequestUserSession(r, session)
-
 		if fromHeader {
 			http.SetCookie(w, &http.Cookie{
 				Name:     grafanaTokenCookie,
