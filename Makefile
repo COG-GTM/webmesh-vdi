@@ -65,12 +65,22 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
 CONTROLLER_TOOLS_VERSION ?= v0.11.1
+ENVTEST_VERSION ?= v0.24.1
+ENVTEST_K8S_VERSION ?= 1.23.5
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+.PHONY: envtest
+envtest: $(ENVTEST)
+	$(ENVTEST) use $(ENVTEST_K8S_VERSION)
+
+$(ENVTEST): $(LOCALBIN)
+	# setup-envtest requires newer Go than the repository's pinned toolchain.
+	GOTOOLCHAIN=auto GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -237,7 +247,7 @@ push-proxy: build-proxy
 ##
 
 GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
-GOLANGCI_VERSION ?= v1.53.3
+GOLANGCI_VERSION ?= v1.54.2
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
 
@@ -246,11 +256,8 @@ lint: $(GOLANGCI_LINT)
 	$(GOLANGCI_LINT) run -v --timeout 600s
 
 # Run tests
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: generate fmt vet manifests
-	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
+test: generate fmt vet manifests envtest
+	KUBEBUILDER_ASSETS=$$($(ENVTEST) use -i -p path $(ENVTEST_K8S_VERSION)) go test ./... -coverprofile cover.out
 
 ##
 ## # Local Testing with k3d
