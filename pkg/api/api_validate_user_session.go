@@ -21,6 +21,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
@@ -34,9 +35,8 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		var authToken string
 
 		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			// the websocket route does not receive request headers from noVNC, so the token is passed
-			// as a query argument. This effectively gives that option to all routes.
-			if keys, ok := r.URL.Query()["token"]; ok {
+			// Websocket clients cannot send headers, so allow query tokens only on websocket routes.
+			if keys, ok := r.URL.Query()["token"]; ok && allowsWebsocketQueryToken(r) {
 				authToken = keys[0]
 			}
 		}
@@ -73,4 +73,8 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		// serve the next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+func allowsWebsocketQueryToken(r *http.Request) bool {
+	return strings.HasPrefix(apiutil.GetGorillaPath(r), "/api/desktops/ws/")
 }
