@@ -13,7 +13,7 @@ env:
   IMAGE_PREFIX: ghcr.io/webmeshproj/vdi
   VERSION: ${{ startswith(github.ref, 'refs/tags/v') && github.ref || 'latest' }}
   GO_VERSION: 1.21
-  NODE_VERSION: 16
+  NODE_VERSION: 20
   BUILD_IDS: --id app --id manager --id proxy
   CACHE_DEP_PATH: go.sum
   BUILD_PARALLELISM: 4
