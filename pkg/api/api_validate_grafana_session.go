@@ -21,6 +21,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
@@ -32,18 +33,12 @@ const grafanaTokenCookie = "kvdi-grafana-token"
 // requests.
 func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authToken := ""
-		fromCookie := false
-
-		if cookie, err := r.Cookie(grafanaTokenCookie); err == nil {
-			authToken = cookie.Value
-			fromCookie = authToken != ""
-		}
+		authToken := r.Header.Get(TokenHeader)
+		fromHeader := authToken != ""
 		if authToken == "" {
-			authToken = r.Header.Get(TokenHeader)
-		}
-		if authToken == "" {
-			authToken = r.URL.Query().Get("token")
+			if cookie, err := r.Cookie(grafanaTokenCookie); err == nil {
+				authToken = cookie.Value
+			}
 		}
 
 		if authToken == "" {
@@ -70,17 +65,25 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 
 		apiutil.SetRequestUserSession(r, session)
 
-		if !fromCookie {
+		if fromHeader {
 			http.SetCookie(w, &http.Cookie{
 				Name:     grafanaTokenCookie,
 				Value:    authToken,
 				Path:     "/api/grafana",
 				HttpOnly: true,
 				SameSite: http.SameSiteStrictMode,
-				Secure:   r.TLS != nil,
+				Secure:   requestIsSecure(r),
 			})
 		}
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func requestIsSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	forwardedProto := strings.SplitN(r.Header.Get("X-Forwarded-Proto"), ",", 2)[0]
+	return strings.EqualFold(strings.TrimSpace(forwardedProto), "https")
 }

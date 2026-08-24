@@ -138,6 +138,73 @@ func TestGrafanaSessionMiddleware(t *testing.T) {
 		}
 	}
 
+	req, err = http.NewRequest(http.MethodGet, addr+"/api/grafana/api/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(TokenHeader, token)
+	req.AddCookie(&http.Cookie{
+		Name:  grafanaTokenCookie,
+		Value: "stale-token",
+	})
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusUnauthorized {
+		t.Fatalf("request with header token and stale cookie returned status %d", res.StatusCode)
+	}
+	var refreshedCookie *http.Cookie
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == grafanaTokenCookie {
+			refreshedCookie = cookie
+			break
+		}
+	}
+	if refreshedCookie == nil || refreshedCookie.Value != token {
+		t.Fatal("valid header token did not refresh the Grafana session cookie")
+	}
+
+	req, err = http.NewRequest(http.MethodGet, addr+"/api/grafana/api/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(TokenHeader, token)
+	req.Header.Set("X-Forwarded-Proto", "HTTPS, http")
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	var secureCookie *http.Cookie
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == grafanaTokenCookie {
+			secureCookie = cookie
+			break
+		}
+	}
+	if secureCookie == nil || !secureCookie.Secure {
+		t.Fatal("HTTPS X-Forwarded-Proto did not set a Secure Grafana session cookie")
+	}
+
+	req, err = http.NewRequest(http.MethodGet, addr+"/api/grafana/api/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(&http.Cookie{
+		Name:  grafanaTokenCookie,
+		Value: "stale-token",
+	})
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("invalid cookie-only request returned status %d", res.StatusCode)
+	}
+
 	req, err = http.NewRequest(http.MethodGet, addr+"/api/grafana/api/health?token="+token, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -147,8 +214,8 @@ func TestGrafanaSessionMiddleware(t *testing.T) {
 		t.Fatal(err)
 	}
 	res.Body.Close()
-	if res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusUnauthorized {
-		t.Fatalf("request with valid query token returned status %d", res.StatusCode)
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("request with query token returned status %d", res.StatusCode)
 	}
 
 	_, unauthorizedToken, err := apiutil.GenerateJWT(
@@ -173,4 +240,37 @@ func TestGrafanaSessionMiddleware(t *testing.T) {
 	if res.StatusCode != http.StatusForbidden {
 		t.Fatalf("unauthorized session returned status %d", res.StatusCode)
 	}
+}
+
+func TestLogoutClearsGrafanaSessionCookie(t *testing.T) {
+	server, addr, password, err := NewTestAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+
+	token := mustGrafanaTestToken(t, addr, password)
+	req, err := http.NewRequest(http.MethodPost, addr+"/api/logout", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(TokenHeader, token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("logout returned status %d", res.StatusCode)
+	}
+
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == grafanaTokenCookie {
+			if cookie.Value != "" || cookie.Path != "/api/grafana" || cookie.MaxAge >= 0 || cookie.Expires.IsZero() {
+				t.Fatalf("logout returned malformed Grafana cookie: %+v", cookie)
+			}
+			return
+		}
+	}
+	t.Fatal("logout did not clear the Grafana session cookie")
 }
