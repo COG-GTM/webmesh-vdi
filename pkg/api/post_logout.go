@@ -22,6 +22,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	desktopsv1 "github.com/kvdi/kvdi/apis/desktops/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
@@ -58,6 +59,16 @@ func (d *desktopAPI) PostLogout(w http.ResponseWriter, r *http.Request) {
 			Secure:   true,
 		})
 	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     grafanaTokenCookie,
+		Value:    "",
+		Path:     "/api/grafana",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   requestIsSecure(r),
+		Expires:  time.Unix(1, 0),
+		MaxAge:   -1,
+	})
 	apiutil.WriteOK(w)
 }
 

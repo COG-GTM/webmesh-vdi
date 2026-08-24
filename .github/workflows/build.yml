@@ -13,7 +13,8 @@ env:
   IMAGE_PREFIX: ghcr.io/webmeshproj/vdi
   VERSION: ${{ startswith(github.ref, 'refs/tags/v') && github.ref || 'latest' }}
   GO_VERSION: 1.21
-  NODE_VERSION: 16
+  NODE_VERSION: 20
+  NODE_OPTIONS: --openssl-legacy-provider
   BUILD_IDS: --id app --id manager --id proxy
   CACHE_DEP_PATH: go.sum
   BUILD_PARALLELISM: 4
@@ -48,8 +49,8 @@ jobs:
       - name: Setup Build Cache
         uses: actions/cache@v3
         with:
-          key: ${{ runner.os }}-build-${{ hashFiles(env.CACHE_DEP_PATH) }}
-          restore-keys: ${{ runner.os }}-build-${{ env.GO_VERSION }}-
+          key: ${{ runner.os }}-build-${{ env.GO_VERSION }}-${{ env.NODE_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH, 'ui/app/yarn.lock') }}
+          restore-keys: ${{ runner.os }}-build-${{ env.GO_VERSION }}-${{ env.NODE_VERSION }}-
           path: |
             ~/go/pkg
             ~/.cache/go-build
