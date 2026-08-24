@@ -205,6 +205,11 @@ export const UserStore = new Vuex.Store({
         const renewable = res.data.renewable
 
         Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
+        if (!res.data.authorized) {
+          await commit('auth_request')
+          commit('auth_need_mfa')
+          return token
+        }
         commit('auth_success', { token, renewable })
         broadcastNewToken.postMessage({ token, renewable })
         return token
