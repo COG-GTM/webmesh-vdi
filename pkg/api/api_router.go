@@ -82,18 +82,17 @@ func (d *desktopAPI) buildRouter() error {
 	r.PathPrefix("/api/healthz").HandlerFunc(d.Healthz).Methods("GET")
 	r.PathPrefix("/api/readyz").HandlerFunc(d.Readyz).Methods("GET")
 
-	// Grafana proxy - This is unprotected for now, but should figure out what
-	// permission model would work well for it. It doesn't fit well into the existing
-	// paradigms.
 	grafanaProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",
 	})
 	grafanaProxy.ModifyResponse = func(res *http.Response) error {
-		res.Header.Del("X-Frame-Options")
+		res.Header.Set("X-Frame-Options", "SAMEORIGIN")
 		return nil
 	}
-	r.PathPrefix("/api/grafana").Handler(grafanaProxy)
+	grafana := r.PathPrefix("/api/grafana").Subrouter()
+	grafana.Use(d.ValidateGrafanaSession)
+	grafana.PathPrefix("").Handler(grafanaProxy)
 
 	// Login route is not protected since it generates the tokens for which a user
 	// can use the protected routes.

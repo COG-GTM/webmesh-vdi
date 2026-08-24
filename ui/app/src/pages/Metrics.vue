@@ -20,14 +20,43 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <q-spinner-hourglass v-if="loading" color="grey" size="4em" />
+      <iframe v-else-if="!error" class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <div v-else class="error-container">
+        <q-icon name="warning" class="text-red" style="font-size: 4rem;" />
+        Unable to load metrics
+      </div>
     </div>
   </q-page>
 </template>
 
 <script>
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+
+  data () {
+    return {
+      loading: true,
+      error: false
+    }
+  },
+
+  methods: {
+    async loadGrafana () {
+      try {
+        await this.$axios.get('/api/grafana/api/health')
+      } catch (err) {
+        this.error = true
+        this.$root.$emit('notify-error', err)
+      } finally {
+        this.loading = false
+      }
+    }
+  },
+
+  mounted () {
+    this.loadGrafana()
+  }
 }
 </script>
 
@@ -46,5 +75,10 @@ export default {
   border: none;
   margin: 0;
   padding: 0;
+}
+
+.error-container {
+  margin: auto;
+  text-align: center;
 }
 </style>
