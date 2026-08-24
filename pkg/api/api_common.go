@@ -76,7 +76,7 @@ func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResul
 	// return the token to the user
 	apiutil.WriteJSON(&types.SessionResponse{
 		Token:      newToken,
-		ExpiresAt:  claims.ExpiresAt,
+		ExpiresAt:  claims.ExpiresAt.Unix(),
 		Renewable:  !result.RefreshNotSupported,
 		User:       result.User,
 		Authorized: authorized,
