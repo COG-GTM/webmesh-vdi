@@ -63,7 +63,9 @@ export default {
       try {
         await this.primeGrafanaCookie()
       } catch (err) {
-        console.error('Unable to refresh Grafana session cookie', err)
+        this.error = true
+        clearInterval(this.grafanaRefreshInterval)
+        this.grafanaRefreshInterval = null
       }
     }
   },
