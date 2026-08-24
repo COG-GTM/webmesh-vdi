@@ -44,7 +44,10 @@ export default class AudioManager extends Emitter {
     this._socket.on('close', (event) => {
       if (!event.wasClean && (event.code === 1006 && !retry)) {
         this._userStore.dispatch('refreshToken')
-          .then(() => {
+          .then((token) => {
+            if (token === null) {
+              return
+            }
             this._connect(true)
           })
           .catch((err) => {

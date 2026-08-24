@@ -107,6 +107,9 @@ export const UserStore = new Vuex.Store({
           const originalRequest = config
           if (status === 401) {
             return this.dispatch('refreshToken').then((token) => {
+              if (token === null) {
+                return Promise.reject(error)
+              }
               originalRequest.headers['X-Session-Token'] = token
               return Vue.prototype.$axios.request(originalRequest)
             })
@@ -205,6 +208,18 @@ export const UserStore = new Vuex.Store({
         const renewable = res.data.renewable
 
         Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
+        if (!res.data.authorized) {
+          commit('auth_error')
+          commit('auth_need_mfa')
+          delete Vue.prototype.$axios.defaults.headers.common['X-Session-Token']
+          Vue.prototype.$q.notify({
+            color: 'red-4',
+            textColor: 'black',
+            icon: 'error',
+            message: 'Your session expired; please re-authenticate'
+          })
+          return null
+        }
         commit('auth_success', { token, renewable })
         broadcastNewToken.postMessage({ token, renewable })
         return token

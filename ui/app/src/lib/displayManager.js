@@ -229,7 +229,10 @@ export default class DisplayManager extends Emitter {
                         console.error(err)
                         console.log('Retrying connection with new token')
                         return this._userStore.dispatch('refreshToken')
-                            .then(() => {
+                            .then((token) => {
+                                if (token === null) {
+                                    return
+                                }
                                 // only retry once
                                 return this._createConnection()
                                     .catch((err) => { 
@@ -261,7 +264,10 @@ export default class DisplayManager extends Emitter {
             } else {
                 if (event.code === 1006 && !retry) {
                     this._userStore.dispatch('refreshToken')
-                        .then(() => {
+                        .then((token) => {
+                            if (token === null) {
+                                return
+                            }
                             this._doStatusWebsocket(true)
                         })
                         .catch((err) => {

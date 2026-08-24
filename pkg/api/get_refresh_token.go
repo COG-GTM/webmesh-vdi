@@ -67,5 +67,5 @@ func (d *desktopAPI) GetRefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	// return a new access and refresh token for the user
 	// TODO: Use state during a refresh?
-	d.returnNewJWT(w, &types.AuthResult{User: user}, true, "")
+	d.checkMFAAndReturnJWT(w, &types.AuthResult{User: user}, "")
 }

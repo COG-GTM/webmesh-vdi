@@ -138,7 +138,10 @@ export default {
       this.socket.addEventListener('close', (ev) => {
         if (!ev.wasClean && ev.code === 1006 && !retry) {
           this.$userStore.dispatch('refreshToken')
-            .then(() => {
+            .then((token) => {
+              if (token === null) {
+                return
+              }
               this.socket = null
               this.streamLogData(true)
             })
