@@ -209,8 +209,9 @@ export const UserStore = new Vuex.Store({
 
         Vue.prototype.$axios.defaults.headers.common['X-Session-Token'] = token
         if (!res.data.authorized) {
-          await commit('auth_request')
+          commit('auth_error')
           commit('auth_need_mfa')
+          delete Vue.prototype.$axios.defaults.headers.common['X-Session-Token']
           return null
         }
         commit('auth_success', { token, renewable })
