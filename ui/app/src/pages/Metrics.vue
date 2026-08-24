@@ -45,6 +45,7 @@ export default {
   methods: {
     async primeGrafanaCookie () {
       await this.$axios.get('/api/grafana/api/health')
+      this.error = false
     },
 
     async loadGrafana () {
