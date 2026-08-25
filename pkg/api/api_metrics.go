@@ -159,12 +159,26 @@ func prometheusMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// sanitizeMethod maps a request method onto a bounded set of label values so
+// that arbitrary methods from a client cannot grow the metric cardinality.
+func sanitizeMethod(method string) string {
+	switch strings.ToUpper(method) {
+	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodDelete, http.MethodHead, http.MethodOptions,
+		http.MethodConnect, http.MethodTrace:
+		return strings.ToUpper(method)
+	default:
+		return "other"
+	}
+}
+
 func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) {
 	path := apiutil.GetGorillaPath(r)
+	method := sanitizeMethod(r.Method)
 	// start a timer
 	timer := prometheus.NewTimer(requestDuration.With(prometheus.Labels{
 		"path":   path,
-		"method": r.Method,
+		"method": method,
 	}))
 
 	// run the request flow
@@ -173,7 +187,7 @@ func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) 
 	// incremement the requestsTotal metric
 	requestsTotal.With(prometheus.Labels{
 		"path":   path,
-		"method": r.Method,
+		"method": method,
 		"code":   strconv.Itoa(w.Status()),
 	}).Inc()
 	// record the duration of the request
