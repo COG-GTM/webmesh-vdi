@@ -144,7 +144,7 @@ func GeneratePassword(length int) (string, error) {
 }
 
 // hashCost is the cost to use for generating salts from passwords
-var hashCost = bcrypt.MinCost
+var hashCost = bcrypt.DefaultCost
 
 // HashPassword creates a salt from a password for storing in a database
 func HashPassword(passw string) (string, error) {
