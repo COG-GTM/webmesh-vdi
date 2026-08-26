@@ -345,6 +345,12 @@ func serveDir(conn *proxyproto.Conn, path string) {
 		conn.WriteError(err)
 		return
 	}
+	// The archive is a copy of the user's data - remove it as soon as it is served.
+	defer func() {
+		if err := os.RemoveAll(filepath.Dir(tarball)); err != nil {
+			fmt.Println("Failed to remove temporary archive:", err)
+		}
+	}()
 	finfo, err := os.Stat(tarball)
 	if err != nil {
 		conn.WriteError(err)

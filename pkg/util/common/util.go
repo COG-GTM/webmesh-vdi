@@ -209,8 +209,6 @@ func TarDirectoryToTempFile(srcPath string) (string, error) {
 	tarball := tar.NewWriter(gzw)
 	defer tarball.Close()
 
-	fmt.Println("Archiving", srcPath, "to", outFile)
-
 	err = filepath.Walk(srcPath,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -227,28 +225,23 @@ func TarDirectoryToTempFile(srcPath string) (string, error) {
 			}
 
 			if info.IsDir() {
-				fmt.Println("Skipping dir:", path)
 				return nil
 			}
 
 			// skip symlinks for now
 			if !info.Mode().IsRegular() {
-				fmt.Println("Skipping symlink or irregular file:", path)
 				return nil
 			}
 
-			fmt.Println("Opening file:", path)
 			file, err := os.Open(path)
 
 			// in case a file gets deleted while we are in the middle of
 			// traversing
 			if err != nil && !os.IsNotExist(err) {
-				fmt.Println("File open error", err, "path:", path)
 				return err
 			}
 
 			defer file.Close()
-			fmt.Println("Copying file:", path)
 			_, err = io.Copy(tarball, file)
 			return err
 		})
@@ -260,6 +253,5 @@ func TarDirectoryToTempFile(srcPath string) (string, error) {
 		return "", err
 	}
 
-	fmt.Println("Finished archive:", outFile)
 	return outFile, nil
 }
