@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v4"
 
 	rbacv1 "github.com/kvdi/kvdi/apis/rbac/v1"
 )
