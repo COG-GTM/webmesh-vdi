@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/context v1.1.1
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/vault v1.9.4
 	github.com/hashicorp/vault/api v1.3.1
 	github.com/jmespath/go-jmespath v0.4.0
