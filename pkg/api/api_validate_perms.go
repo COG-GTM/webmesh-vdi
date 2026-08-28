@@ -81,6 +81,17 @@ var RouterGrantRequirements = map[string]map[string]MethodPermissions{
 			OverrideFunc: allowAll,
 		},
 	},
+	"/api/grafana": {
+		"GET": {
+			OverrideFunc: allowAll,
+		},
+		"HEAD": {
+			OverrideFunc: allowAll,
+		},
+		"POST": {
+			OverrideFunc: allowAll,
+		},
+	},
 	"/api/config/reload": {
 		"POST": {
 			OverrideFunc: allowAll,
