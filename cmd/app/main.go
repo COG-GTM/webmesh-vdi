@@ -77,6 +77,7 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
+		applogger.Info("WARNING: TLS is disabled for the app listener. Session tokens, credentials, desktop display, audio, and file transfer traffic are served in cleartext over HTTP. Only use this mode when encryption is terminated by another layer in front of kVDI.")
 		if err := srvr.ListenAndServe(); err != nil {
 			applogger.Error(err, "Failed to start http server")
 			os.Exit(1)
