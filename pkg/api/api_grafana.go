@@ -19,11 +19,28 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 
 package api
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // GrafanaSessionCookie is the name of the cookie used to carry a session token
 // on requests made from inside the embedded grafana iframe.
 const GrafanaSessionCookie = "kvdi-grafana-token"
+
+// requestIsHTTPS reports whether the request reached the client over HTTPS,
+// accounting for TLS being terminated by a proxy in front of the app.
+func requestIsHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	proto := r.Header.Get("X-Forwarded-Proto")
+	if proto == "" {
+		return false
+	}
+	// the header may be a comma separated list, the first value is the client
+	return strings.EqualFold(strings.TrimSpace(strings.Split(proto, ",")[0]), "https")
+}
 
 // grafanaSession stores the session token from the iframe URL in a cookie scoped
 // to the grafana proxy. The assets and API calls grafana makes from inside the
@@ -39,7 +56,7 @@ func grafanaSession(next http.Handler) http.Handler {
 				Value:    token,
 				Path:     "/api/grafana",
 				HttpOnly: true,
-				Secure:   r.TLS != nil,
+				Secure:   requestIsHTTPS(r),
 				SameSite: http.SameSiteStrictMode,
 			})
 			query.Del("token")
