@@ -41,6 +41,14 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 			}
 		}
 
+		if authToken == "" {
+			// requests made from inside the embedded grafana iframe carry the
+			// token in a cookie scoped to the grafana proxy.
+			if cookie, err := r.Cookie(GrafanaSessionCookie); err == nil {
+				authToken = cookie.Value
+			}
+		}
+
 		// if we don't have a token we can't proceed
 		if authToken == "" {
 			apiutil.ReturnAPIForbidden(nil, "No token provided in request", w)

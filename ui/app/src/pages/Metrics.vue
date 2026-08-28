@@ -20,14 +20,44 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 <template>
   <q-page flex>
     <div class="display-container">
-      <iframe class="iframe-container" src="/api/grafana/?orgId=1&refresh=5s&kiosk=tv" />
+      <iframe class="iframe-container" :src="grafanaURL" />
     </div>
   </q-page>
 </template>
 
 <script>
+// grafana requests do not go through axios, so they cannot trigger the token
+// refresh interceptor. Renew on an interval instead, which recomputes the iframe
+// source and re-seeds the proxy cookie.
+const tokenRefreshInterval = 5 * 60 * 1000
+
 export default {
-  name: 'Metrics'
+  name: 'Metrics',
+
+  data () {
+    return { refreshTimer: null }
+  },
+
+  computed: {
+    grafanaURL () {
+      const token = encodeURIComponent(this.$userStore.getters.token)
+      return `/api/grafana/?orgId=1&refresh=5s&kiosk=tv&token=${token}`
+    }
+  },
+
+  mounted () {
+    this.refreshTimer = setInterval(() => {
+      if (this.$userStore.getters.renewable) {
+        this.$userStore.dispatch('refreshToken')
+      }
+    }, tokenRefreshInterval)
+  },
+
+  beforeDestroy () {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer)
+    }
+  }
 }
 </script>
 
