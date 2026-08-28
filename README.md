@@ -41,7 +41,7 @@ I wrote up a [`CONTRIBUTING`](CONTRIBUTING.md) doc just outlining some of the st
 
 ## Features
 
-- Containerized user desktops running on Kubernetes with no virtualization required (`libvirt` options may come in the future). All traffic between the end user and the "desktop" is encrypted.
+- Containerized user desktops running on Kubernetes with no virtualization required (`libvirt` options may come in the future). All traffic between the end user and the "desktop" is encrypted, unless the app listener is explicitly switched to plaintext HTTP with `app.tls.disable` (see [Security](#security)).
 
 - Persistent user data
 
@@ -186,6 +186,8 @@ If not using anonymous auth, look for `kvdi-admin-secret` to retrieve the `admin
 
 All traffic between processes is encrypted with mTLS.
 The UI for the "desktop" containers is placed behind a VNC server listening on a UNIX socket and a sidecar to the container will proxy validated websocket connections to it.
+
+Setting `app.tls.disable` (the `--disable-tls` flag on the app) turns the frontend listener into plaintext HTTP on port 80. In that mode session tokens (including the `?token=` query parameter used by the display and audio websockets), login credentials, desktop framebuffer and audio streams, and transferred files all leave the cluster unencrypted. Only enable it when TLS is terminated by an ingress, service mesh, or other layer in front of kVDI; the app logs a warning on startup whenever it is enabled.
 
 ![img](doc/kvdi_arch.png)
 
