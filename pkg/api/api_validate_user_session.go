@@ -33,9 +33,10 @@ func (d *desktopAPI) ValidateUserSession(next http.Handler) http.Handler {
 		// get the auth token
 		var authToken string
 
-		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			// the websocket route does not receive request headers from noVNC, so the token is passed
-			// as a query argument. This effectively gives that option to all routes.
+		if authToken = r.Header.Get(TokenHeader); authToken == "" && isWebsocket(apiutil.GetGorillaPath(r)) {
+			// the websocket routes do not receive request headers from noVNC, so the token is
+			// passed as a query argument. Other routes only accept the token in the header, to
+			// keep credentials out of access logs, browser history and Referer headers.
 			if keys, ok := r.URL.Query()["token"]; ok {
 				authToken = keys[0]
 			}
