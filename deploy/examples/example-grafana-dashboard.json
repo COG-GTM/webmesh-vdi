@@ -591,9 +591,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(kvdi_ws_display_bytes_sent_total[5m])) by (client,desktop)",
+          "expr": "sum(irate(kvdi_ws_display_bytes_sent_total[5m])) by (desktop)",
           "interval": "",
-          "legendFormat": "{{ desktop }} -> {{ client }}",
+          "legendFormat": "{{ desktop }} (sent)",
           "refId": "A"
         }
       ],
@@ -689,9 +689,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(kvdi_ws_display_bytes_rcvd_total[5m])) by (client,desktop)",
+          "expr": "sum(irate(kvdi_ws_display_bytes_rcvd_total[5m])) by (desktop)",
           "interval": "",
-          "legendFormat": "{{ client }} -> {{ desktop }}",
+          "legendFormat": "{{ desktop }} (received)",
           "refId": "A"
         }
       ],
@@ -787,9 +787,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(kvdi_ws_audio_bytes_sent_total[5m])) by (client,desktop)",
+          "expr": "sum(irate(kvdi_ws_audio_bytes_sent_total[5m])) by (desktop)",
           "interval": "",
-          "legendFormat": "{{ desktop }} -> {{ client }}",
+          "legendFormat": "{{ desktop }} (sent)",
           "refId": "A"
         }
       ],
@@ -885,9 +885,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(kvdi_ws_audio_bytes_rcvd_total[5m])) by (client,desktop)",
+          "expr": "sum(irate(kvdi_ws_audio_bytes_rcvd_total[5m])) by (desktop)",
           "interval": "",
-          "legendFormat": "{{ client }} -> {{ desktop }}",
+          "legendFormat": "{{ desktop }} (received)",
           "refId": "A"
         }
       ],
