@@ -95,9 +95,10 @@ type DesktopConfig struct {
 	// sudo with no password.
 	AllowRoot bool `json:"allowRoot,omitempty"`
 	// The type of init system inside the image, currently only `supervisord` and `systemd`
-	// are supported. Defaults to `systemd`. `systemd` containers are run privileged and
-	// downgrading to the desktop user must be done within the image's init process. `supervisord`
-	// containers are run with minimal capabilities and directly as the desktop user.
+	// are supported. Defaults to `systemd`. `systemd` containers are run as root with
+	// `CAP_SYS_ADMIN` and downgrading to the desktop user must be done within the image's
+	// init process. `supervisord` containers are run with minimal capabilities and directly
+	// as the desktop user.
 	Init DesktopInit `json:"init,omitempty"`
 }
 
