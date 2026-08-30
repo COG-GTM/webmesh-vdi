@@ -58,6 +58,7 @@ func (d *desktopAPI) PostLogout(w http.ResponseWriter, r *http.Request) {
 			Secure:   true,
 		})
 	}
+	http.SetCookie(w, grafanaTokenCookie(r, ""))
 	apiutil.WriteOK(w)
 }
 

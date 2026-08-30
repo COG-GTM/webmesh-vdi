@@ -21,6 +21,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
@@ -35,17 +36,43 @@ const grafanaProxyPath = "/api/grafana"
 // grafana requests afterwards.
 const GrafanaTokenCookie = "kvdi-grafana-token"
 
+// requestIsTLS returns true when the request reached kvdi over TLS, either
+// directly or through a proxy that terminated it.
+func requestIsTLS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+// grafanaTokenCookie builds the cookie carrying the given session token for the
+// grafana proxy. An empty token expires the cookie.
+func grafanaTokenCookie(r *http.Request, token string) *http.Cookie {
+	cookie := &http.Cookie{
+		Name:     GrafanaTokenCookie,
+		Value:    token,
+		Path:     grafanaProxyPath,
+		HttpOnly: true,
+		Secure:   requestIsTLS(r),
+		SameSite: http.SameSiteStrictMode,
+	}
+	if token == "" {
+		cookie.MaxAge = -1
+	}
+	return cookie
+}
+
 // ValidateGrafanaSession requires an authorized kvdi session on requests to the
 // grafana proxy. The token can be provided in the session header, a token query
-// argument, or the cookie set on a previously validated request.
+// argument, or the cookie set on a previously validated request. A token in the
+// query is moved into the cookie with a redirect, so it is not carried on the
+// requests grafana makes afterwards.
 func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var authToken string
-		var fromCookie bool
+		var fromCookie, fromQuery bool
 
 		if authToken = r.Header.Get(TokenHeader); authToken == "" {
 			if keys, ok := r.URL.Query()["token"]; ok && len(keys) > 0 {
 				authToken = keys[0]
+				fromQuery = true
 			}
 		}
 		if authToken == "" {
@@ -76,14 +103,16 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 		}
 
 		if !fromCookie {
-			http.SetCookie(w, &http.Cookie{
-				Name:     GrafanaTokenCookie,
-				Value:    authToken,
-				Path:     grafanaProxyPath,
-				HttpOnly: true,
-				Secure:   r.TLS != nil,
-				SameSite: http.SameSiteStrictMode,
-			})
+			http.SetCookie(w, grafanaTokenCookie(r, authToken))
+		}
+
+		if fromQuery {
+			redirect := *r.URL
+			query := redirect.Query()
+			query.Del("token")
+			redirect.RawQuery = query.Encode()
+			http.Redirect(w, r, redirect.RequestURI(), http.StatusFound)
+			return
 		}
 
 		apiutil.SetRequestUserSession(r, session)
