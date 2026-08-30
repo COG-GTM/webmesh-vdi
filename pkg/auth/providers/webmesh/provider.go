@@ -74,7 +74,14 @@ func (a *AuthProvider) Setup(cli client.Client, cluster *appv1.VDICluster) error
 	a.validateURL = validateURL
 	a.cluster = cluster
 	a.client = cli
-	a.http = &http.Client{Timeout: metadataTimeout}
+	a.http = &http.Client{
+		Timeout: metadataTimeout,
+		// user credentials are sent on this request, so never follow a redirect
+		// to another destination
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return fmt.Errorf("webmesh metadata service redirected to %q, refusing to forward credentials", req.URL.Redacted())
+		},
+	}
 	return nil
 }
 
