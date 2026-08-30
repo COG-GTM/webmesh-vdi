@@ -25,8 +25,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/go-logr/logr"
@@ -43,10 +44,15 @@ import (
 // authentication backend. Access to groups provided in the claims is supplied
 // through annotations on VDIRoles.
 type AuthProvider struct {
-	metadataURL string
+	validateURL string
 	cluster     *appv1.VDICluster
 	client      client.Client
+	http        *http.Client
 }
+
+// metadataTimeout is how long to wait on the metadata service when validating
+// a token.
+const metadataTimeout = time.Second * 10
 
 // New returns a new AuthProvider.
 func New() *AuthProvider {
@@ -61,10 +67,32 @@ func (a *AuthProvider) Reconcile(context.Context, logr.Logger, client.Client, *a
 // Setup is called when the kVDI app launches and is a chance for the provider
 // to setup any resources it needs to serve requests.
 func (a *AuthProvider) Setup(cli client.Client, cluster *appv1.VDICluster) error {
-	a.metadataURL = cluster.Spec.Auth.WebmeshAuth.MetadataURL
+	validateURL, err := metadataValidateURL(cluster.Spec.Auth.WebmeshAuth.MetadataURL)
+	if err != nil {
+		return err
+	}
+	a.validateURL = validateURL
 	a.cluster = cluster
 	a.client = cli
+	a.http = &http.Client{Timeout: metadataTimeout}
 	return nil
+}
+
+// metadataValidateURL builds the token validation endpoint for the given
+// metadata URL. User credentials are sent to this endpoint, so it must be an
+// absolute HTTPS URL.
+func metadataValidateURL(metadataURL string) (string, error) {
+	parsed, err := url.Parse(metadataURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid webmesh metadataURL: %w", err)
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("webmesh metadataURL must be an absolute URL, got %q", metadataURL)
+	}
+	if parsed.Scheme != "https" {
+		return "", fmt.Errorf("webmesh metadataURL must use https, got scheme %q", parsed.Scheme)
+	}
+	return parsed.JoinPath("id-tokens", "validate").String(), nil
 }
 
 // Close is called after temporary uses of the auth provider. It should close
@@ -86,12 +114,12 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 	if token == "" {
 		return nil, fmt.Errorf("no Authorization header provided")
 	}
-	r, err := http.NewRequest("GET", path.Join(a.metadataURL, "id-tokens", "validate"), nil)
+	r, err := http.NewRequest("GET", a.validateURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	r.Header.Set("Authorization", token)
-	resp, err := http.DefaultClient.Do(r)
+	resp, err := a.http.Do(r)
 	if err != nil {
 		return nil, err
 	}
