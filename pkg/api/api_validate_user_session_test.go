@@ -20,6 +20,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -86,8 +87,21 @@ func TestValidateUserSessionMFA(t *testing.T) {
 		}
 	}
 
-	// the MFA verification route itself must remain reachable
-	if code, body := mustDo(t, http.MethodPost, opts.URL+"/api/authorize", token, `{"otp":"000000"}`); strings.Contains(body, "User session is not authorized") {
-		t.Errorf("Expected POST /api/authorize to be reachable with an unauthorized session, got %d: %s", code, body)
+	// the MFA verification route itself must remain reachable - the test user has
+	// no MFA configured, so it hands back an authorized token
+	code, body := mustDo(t, http.MethodPost, opts.URL+"/api/authorize", token, `{"otp":"000000"}`)
+	if code != http.StatusOK {
+		t.Fatalf("Expected POST /api/authorize to succeed with an unauthorized session, got %d: %s", code, body)
+	}
+	var res types.SessionResponse
+	if err := json.Unmarshal([]byte(body), &res); err != nil {
+		t.Fatalf("Could not decode authorize response %q: %s", body, err)
+	}
+	claims, err := apiutil.DecodeAndVerifyJWT([]byte("supersecret"), res.Token)
+	if err != nil {
+		t.Fatalf("Could not verify the token returned by /api/authorize: %s", err)
+	}
+	if !claims.Authorized {
+		t.Error("Expected the token returned by /api/authorize to be authorized")
 	}
 }
