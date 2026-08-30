@@ -53,29 +53,29 @@ var (
 	displayBytesSentTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "kvdi",
 		Name:      "ws_display_bytes_sent_total",
-		Help:      "Total bytes sent over websocket display connections by desktop and client.",
-	}, []string{"desktop", "client"})
+		Help:      "Total bytes sent over websocket display connections by desktop.",
+	}, []string{"desktop"})
 
 	// audioBytesSentTotal tracks bytes sent over a websocket audio stream
 	audioBytesSentTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "kvdi",
 		Name:      "ws_audio_bytes_sent_total",
-		Help:      "Total bytes sent over websocket audio connections by desktop and client.",
-	}, []string{"desktop", "client"})
+		Help:      "Total bytes sent over websocket audio connections by desktop.",
+	}, []string{"desktop"})
 
 	// displayBytesSentTotal tracks bytes received over a websocket display stream
 	displayBytesReceivedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "kvdi",
 		Name:      "ws_display_bytes_rcvd_total",
-		Help:      "Total bytes received over websocket display connections by desktop and client.",
-	}, []string{"desktop", "client"})
+		Help:      "Total bytes received over websocket display connections by desktop.",
+	}, []string{"desktop"})
 
 	// audioBytesSentTotal tracks bytes received over a websocket audio stream
 	audioBytesReceivedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "kvdi",
 		Name:      "ws_audio_bytes_rcvd_total",
-		Help:      "Total bytes received over websocket audio connections by desktop and client.",
-	}, []string{"desktop", "client"})
+		Help:      "Total bytes received over websocket audio connections by desktop.",
+	}, []string{"desktop"})
 
 	// activeDisplayStreams tracks the number of active display connections
 	activeDisplayStreams = promauto.NewGauge(prometheus.GaugeOpts{
@@ -100,8 +100,8 @@ type apiResponseWriter struct {
 	http.ResponseWriter
 	status int
 
-	isAudio, isDisplay      bool
-	clientAddr, desktopName string
+	isAudio, isDisplay bool
+	desktopName        string
 }
 
 func (a *apiResponseWriter) WriteHeader(s int) {
@@ -132,7 +132,7 @@ func (a *apiResponseWriter) getBytesRcvdCounter() (counter *prometheus.CounterVe
 
 func (a *apiResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	conn, rw, err := apiutil.NewWebsocketWatcher(nil).
-		WithLabels(map[string]string{"desktop": a.desktopName, "client": a.clientAddr}).
+		WithLabels(map[string]string{"desktop": a.desktopName}).
 		WithMetrics(a.getBytesSentCounter(), a.getBytesRcvdCounter()).
 		Hijack(a.ResponseWriter)
 
@@ -182,7 +182,6 @@ func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) 
 
 func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) {
 	path := apiutil.GetGorillaPath(r)
-	w.clientAddr = strings.Split(r.RemoteAddr, ":")[0]
 	w.desktopName = apiutil.GetNamespacedNameFromRequest(r).String()
 	if isDisplayWebsocket(path) {
 		// this is a display connection
