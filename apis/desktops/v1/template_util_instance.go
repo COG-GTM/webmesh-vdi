@@ -161,17 +161,15 @@ func (t *Template) GetDesktopEnvVars(desktop *Session) []corev1.EnvVar {
 // pods booted from this template.
 func (t *Template) GetDesktopContainerSecurityContext() *corev1.SecurityContext {
 	capabilities := make([]corev1.Capability, 0)
-	var privileged bool
+	privileged := false
 	var user int64
 	if t.GetInitSystem() == InitSystemd {
 		// The method of using systemd-logind to trigger a systemd --user process
 		// requires CAP_SYS_ADMIN. Specifically, SECCOMP spawning. There might
 		// be other ways around this by just using system unit files for everything.
 		capabilities = append(capabilities, "SYS_ADMIN")
-		privileged = true
 		user = 0
 	} else {
-		privileged = false
 		user = v1.DefaultUser
 	}
 	if t.Spec.DesktopConfig != nil {
