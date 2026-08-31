@@ -44,7 +44,7 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 		var fromQuery bool
 
 		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			if keys, ok := r.URL.Query()["token"]; ok {
+			if keys, ok := r.URL.Query()["token"]; ok && keys[0] != "" {
 				authToken = keys[0]
 				fromQuery = true
 			} else if cookie, err := r.Cookie(GrafanaSessionCookie); err == nil {
@@ -80,7 +80,7 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 				Value:    authToken,
 				Path:     "/api/grafana",
 				HttpOnly: true,
-				Secure:   true,
+				Secure:   !d.vdiCluster.AppTLSIsDisabled(),
 				SameSite: http.SameSiteStrictMode,
 			})
 		}
