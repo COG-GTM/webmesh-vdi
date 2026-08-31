@@ -21,6 +21,11 @@ package api
 
 import (
 	"bufio"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -91,6 +96,37 @@ var (
 		Help:      "The current number of active audio streams.",
 	})
 )
+
+// clientLabelSalt keys the pseudonymization of client addresses in exported
+// metrics. It is generated per process and never leaves it, so the exported
+// labels cannot be resolved back to an address.
+var clientLabelSalt = newClientLabelSalt()
+
+func newClientLabelSalt() []byte {
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		panic(fmt.Sprintf("failed to generate a salt for metrics client labels: %s", err))
+	}
+	return salt
+}
+
+// clientHost extracts the host portion of a remote address, which may or may
+// not carry a port and may be IPv6.
+func clientHost(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return strings.Trim(remoteAddr, "[]")
+}
+
+// clientLabel returns the value to export for a client address. Streams from
+// different clients still carry different labels, but the address itself is not
+// published in the metrics.
+func clientLabel(addr string) string {
+	mac := hmac.New(sha256.New, clientLabelSalt)
+	mac.Write([]byte(addr))
+	return hex.EncodeToString(mac.Sum(nil))[:12]
+}
 
 // apiResponseWriter extends the regular http.ResponseWriter and stores the
 // status code internally to be referenced by the metrics collector.
@@ -182,7 +218,7 @@ func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) 
 
 func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) {
 	path := apiutil.GetGorillaPath(r)
-	w.clientAddr = strings.Split(r.RemoteAddr, ":")[0]
+	w.clientAddr = clientLabel(clientHost(r.RemoteAddr))
 	w.desktopName = apiutil.GetNamespacedNameFromRequest(r).String()
 	if isDisplayWebsocket(path) {
 		// this is a display connection
