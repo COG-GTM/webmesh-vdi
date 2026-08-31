@@ -110,6 +110,15 @@ func newClientLabelSalt() []byte {
 	return salt
 }
 
+// clientHost extracts the host portion of a remote address, which may or may
+// not carry a port and may be IPv6.
+func clientHost(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return strings.Trim(remoteAddr, "[]")
+}
+
 // clientLabel returns the value to export for a client address. Streams from
 // different clients still carry different labels, but the address itself is not
 // published in the metrics.
@@ -209,7 +218,7 @@ func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) 
 
 func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) {
 	path := apiutil.GetGorillaPath(r)
-	w.clientAddr = clientLabel(strings.Split(r.RemoteAddr, ":")[0])
+	w.clientAddr = clientLabel(clientHost(r.RemoteAddr))
 	w.desktopName = apiutil.GetNamespacedNameFromRequest(r).String()
 	if isDisplayWebsocket(path) {
 		// this is a display connection
