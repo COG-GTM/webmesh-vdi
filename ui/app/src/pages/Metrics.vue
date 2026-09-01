@@ -32,7 +32,7 @@ export default {
   data () {
     return {
       authorized: false,
-      renewInterval: null
+      renewTimeout: null
     }
   },
 
@@ -48,23 +48,53 @@ export default {
 
   mounted () {
     this.authorizeGrafana()
-    // The iframe's requests bypass the axios interceptors that renew an expired
-    // token, so the session cookie is refreshed on a timer instead.
-    this.renewInterval = setInterval(this.authorizeGrafana, 60000)
   },
 
   beforeDestroy () {
-    clearInterval(this.renewInterval)
+    clearTimeout(this.renewTimeout)
   },
 
   methods: {
+    // authorizeGrafana exchanges the session token for the cookie the embedded
+    // grafana UI uses to authenticate its own requests.
     async authorizeGrafana () {
       try {
         await this.$axios.get('/api/grafana/api/health')
         this.authorized = true
+        this.scheduleRenewal()
       } catch (err) {
         this.authorized = false
         this.$root.$emit('notify-error', err)
+      }
+    },
+
+    // The iframe's requests bypass the axios interceptor that renews an expired
+    // token, so the token is renewed before the cookie it issued expires.
+    scheduleRenewal () {
+      clearTimeout(this.renewTimeout)
+      if (!this.$userStore.getters.renewable) {
+        return
+      }
+      const expiresAt = this.tokenExpiry()
+      if (expiresAt === null) {
+        return
+      }
+      const renewIn = Math.max(expiresAt - Date.now() - 30000, 0)
+      this.renewTimeout = setTimeout(async () => {
+        try {
+          await this.$userStore.dispatch('refreshToken')
+        } catch (err) {
+          this.$root.$emit('notify-error', err)
+        }
+      }, renewIn)
+    },
+
+    tokenExpiry () {
+      try {
+        const claims = JSON.parse(atob(this.token.split('.')[1]))
+        return claims.exp * 1000
+      } catch (err) {
+        return null
       }
     }
   }
