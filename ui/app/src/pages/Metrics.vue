@@ -26,6 +26,8 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 </template>
 
 <script>
+const MAX_TIMEOUT = 2147483647
+
 export default {
   name: 'Metrics',
 
@@ -79,7 +81,14 @@ export default {
       if (expiresAt === null) {
         return
       }
-      const renewIn = Math.max(expiresAt - Date.now() - 30000, 0)
+      const renewAt = expiresAt - 30000
+      const renewIn = Math.max(renewAt - Date.now(), 0)
+      if (renewIn > MAX_TIMEOUT) {
+        // Timer delays are capped at a 32-bit value, so long-lived tokens are
+        // rescheduled in chunks until the renewal time is actually reached.
+        this.renewTimeout = setTimeout(this.scheduleRenewal, MAX_TIMEOUT)
+        return
+      }
       this.renewTimeout = setTimeout(async () => {
         try {
           await this.$userStore.dispatch('refreshToken')
@@ -91,7 +100,8 @@ export default {
 
     tokenExpiry () {
       try {
-        const claims = JSON.parse(atob(this.token.split('.')[1]))
+        const payload = this.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+        const claims = JSON.parse(atob(payload))
         return claims.exp * 1000
       } catch (err) {
         return null
