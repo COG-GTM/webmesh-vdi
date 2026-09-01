@@ -108,7 +108,8 @@ type AppConfig struct {
 	Image string `json:"image,omitempty"`
 	// Whether to add CORS headers to API requests
 	CORSEnabled bool `json:"corsEnabled,omitempty"`
-	// Whether to log auditing events to stdout
+	// Whether to log auditing events to stdout. Defaults to `true`.
+	// +kubebuilder:default=true
 	AuditLog bool `json:"auditLog,omitempty"`
 	// The number of app replicas to run
 	Replicas int32 `json:"replicas,omitempty"`

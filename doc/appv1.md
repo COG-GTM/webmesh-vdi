@@ -55,7 +55,7 @@ AppConfig represents app configurations for the VDI cluster
 </tr>
 <tr class="odd">
 <td><code>auditLog</code> <em>bool</em></td>
-<td><p>Whether to log auditing events to stdout</p></td>
+<td><p>Whether to log auditing events to stdout. Defaults to <code>true</code>.</p></td>
 </tr>
 <tr class="even">
 <td><code>replicas</code> <em>int32</em></td>
