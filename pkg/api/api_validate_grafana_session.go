@@ -21,6 +21,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
@@ -32,21 +33,19 @@ import (
 const GrafanaTokenCookie = "kvdi-grafana-token"
 
 // ValidateGrafanaSession verifies that requests to the grafana proxy carry a
-// valid, authorized kvdi session. The token may be provided in the session
-// header, as a query argument, or in the cookie set from a previous request
-// with a query argument. The cookie is what allows the sub-resources requested
-// by the embedded grafana UI to be authenticated.
+// valid, authorized kvdi session. The token is taken from the session header,
+// or from the cookie set on a previous request that carried the header. The
+// cookie is what allows the sub-resources requested by the embedded grafana UI,
+// which cannot set headers, to be authenticated.
 func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var authToken string
-		var fromQuery bool
+		var fromHeader bool
 
-		if authToken = r.Header.Get(TokenHeader); authToken == "" {
-			if keys, ok := r.URL.Query()["token"]; ok {
-				authToken, fromQuery = keys[0], true
-			} else if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
-				authToken = cookie.Value
-			}
+		if authToken = r.Header.Get(TokenHeader); authToken != "" {
+			fromHeader = true
+		} else if cookie, err := r.Cookie(GrafanaTokenCookie); err == nil {
+			authToken = cookie.Value
 		}
 
 		if authToken == "" {
@@ -71,18 +70,24 @@ func (d *desktopAPI) ValidateGrafanaSession(next http.Handler) http.Handler {
 			return
 		}
 
-		if fromQuery {
+		if fromHeader {
 			http.SetCookie(w, &http.Cookie{
 				Name:     GrafanaTokenCookie,
 				Value:    authToken,
 				Path:     "/api/grafana",
 				Expires:  time.Unix(session.ExpiresAt, 0),
 				HttpOnly: true,
-				Secure:   r.TLS != nil,
+				Secure:   isHTTPS(r),
 				SameSite: http.SameSiteStrictMode,
 			})
 		}
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isHTTPS returns true if the request reached the server over TLS, either
+// directly or through a terminating proxy.
+func isHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
