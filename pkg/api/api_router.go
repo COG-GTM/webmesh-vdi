@@ -82,9 +82,10 @@ func (d *desktopAPI) buildRouter() error {
 	r.PathPrefix("/api/healthz").HandlerFunc(d.Healthz).Methods("GET")
 	r.PathPrefix("/api/readyz").HandlerFunc(d.Readyz).Methods("GET")
 
-	// Grafana proxy - This is unprotected for now, but should figure out what
-	// permission model would work well for it. It doesn't fit well into the existing
-	// paradigms.
+	// Grafana proxy - the grafana sidecar allows anonymous access, so the proxy
+	// requires a valid kvdi session of its own. It doesn't fit well into the
+	// grant evaluation of the protected subrouter, so any authorized user is
+	// allowed through.
 	grafanaProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.1:3000",
@@ -93,7 +94,7 @@ func (d *desktopAPI) buildRouter() error {
 		res.Header.Del("X-Frame-Options")
 		return nil
 	}
-	r.PathPrefix("/api/grafana").Handler(grafanaProxy)
+	r.PathPrefix("/api/grafana").Handler(d.ValidateGrafanaSession(grafanaProxy))
 
 	// Login route is not protected since it generates the tokens for which a user
 	// can use the protected routes.
