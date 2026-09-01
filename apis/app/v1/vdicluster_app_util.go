@@ -108,11 +108,12 @@ func (c *VDICluster) EnableCORS() bool {
 }
 
 // AuditLogEnabled returns true if auditing events should be logged to stdout.
+// Auditing is on unless it is explicitly disabled in the app configuration.
 func (c *VDICluster) AuditLogEnabled() bool {
 	if c.Spec.App != nil {
 		return c.Spec.App.AuditLog
 	}
-	return false
+	return true
 }
 
 // GetAppSecretsName returns the name of the secret to use for app secrets.
