@@ -996,7 +996,7 @@
       "type": "object",
       "properties": {
         "auditLog": {
-          "description": "Whether to log auditing events to stdout",
+          "description": "Whether to log auditing events to stdout. Defaults to `true`.",
           "type": "boolean",
           "x-go-name": "AuditLog"
         },
