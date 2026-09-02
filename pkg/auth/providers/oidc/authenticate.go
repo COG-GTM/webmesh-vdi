@@ -20,12 +20,16 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package oidc
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	gooidc "github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
 
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
@@ -37,56 +41,83 @@ import (
 	"github.com/kvdi/kvdi/pkg/util/rbac"
 )
 
+const (
+	// how long a client has to return from the provider after being redirected
+	pendingFlowTTL = 10 * time.Minute
+	// how long authorized claims can be redeemed after the provider callback
+	authorizedClaimsTTL = 2 * time.Minute
+)
+
+// stateRecord is what gets persisted in the secrets backend for an in-flight
+// OIDC flow. Result is nil until the provider callback has been verified.
+type stateRecord struct {
+	Nonce     string            `json:"nonce"`
+	ExpiresAt time.Time         `json:"expiresAt"`
+	Result    *types.AuthResult `json:"result,omitempty"`
+}
+
+func (s *stateRecord) expired() bool { return time.Now().After(s.ExpiresAt) }
+
 // Authenticate is called for API authentication requests. It should generate
 // a new JWTClaims object and serve an AuthResult back to the API.
 func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult, error) {
 	r := req.GetRequest()
 
-	// POST methods are the start and end of an oidc flow. If we recorded claims
+	// POST methods are the start and end of an oidc flow. If we recorded verified claims
 	// for the provided state we return them back to the API. Otherwise, we start a new flow
 	// with the provided state.
 	if r.Method == http.MethodPost {
-		if req.State == "" {
+		if req.GetState() == "" {
 			return nil, errors.New("No 'state' provided in the request")
 		}
-		// get the key where we would have stored already authorized claims.
-		// This flow should be thought through more. On one hand we are providing an
-		// extra verification of the state for the client. On the other hand, if an
-		// attacker gets the user's state token mid-flow, they could impersonate the
-		// user and steal their token.
-		// The client should be generating new state tokens each time, and as long
-		// as the full auth flow is encrypted I _think_ the risk is pretty low.
 		stateKey := getStateSecretKey(req.GetState())
-		existingClaim, err := a.secrets.ReadSecret(stateKey, true)
+		record, err := a.readStateRecord(stateKey)
 		if err != nil {
-			// If the secret is not found it means we have not generated claims yet
-			// for this user. Return the oauth redirect.
-			if errors.IsSecretNotFoundError(err) {
-				return &types.AuthResult{
-					// Use offline access to get a refresh token that we can use to generate new
-					// internal access tokens for the user.
-					RedirectURL: a.oauthCfg.AuthCodeURL(req.GetState(), oauth2.AccessTypeOffline),
-				}, nil
-			}
 			return nil, err
 		}
-		// clear the state secret for this auth session
-		if err := a.secrets.Lock(15); err != nil {
+		if record == nil || record.expired() {
+			// never started or stale: register a fresh flow and return the oauth redirect.
+			return a.startFlow(stateKey, req.GetState())
+		}
+		if record.Result == nil {
+			// still pending: re-issue the redirect with the same nonce so an in-flight
+			// provider callback remains valid.
+			return &types.AuthResult{RedirectURL: a.authCodeURL(req.GetState(), record.Nonce)}, nil
+		}
+		// claims are single-use, clear the state secret for this auth session
+		if err := a.deleteStateRecord(stateKey); err != nil {
 			return nil, err
 		}
-		defer a.secrets.Release()
-		if err := a.secrets.WriteSecret(stateKey, nil); err != nil {
-			return nil, err
-		}
-		authResult := &types.AuthResult{}
-		return authResult, json.Unmarshal(existingClaim, authResult)
+		return record.Result, nil
 	}
 
 	// GET is the middle part of the oauth flow. This is to trick the client into
 	// sending another post to retrieve its token.
 
-	// fetch the state key from the request
-	stateKey := getStateSecretKey(r.URL.Query().Get("state"))
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		return nil, errors.New("No 'state' provided in the callback")
+	}
+	stateKey := getStateSecretKey(state)
+
+	// the callback must belong to a flow this server started and that has not yet completed
+	record, err := a.readStateRecord(stateKey)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil || record.expired() {
+		if record != nil {
+			if err := a.deleteStateRecord(stateKey); err != nil {
+				return nil, err
+			}
+		}
+		return nil, errors.New("Unknown or expired 'state' in the callback")
+	}
+	if record.Result != nil {
+		// a duplicate callback must not clobber claims the client has yet to redeem
+		return nil, errors.New("Flow for this 'state' has already completed")
+	}
+
 	// get the oauth token from the provider
 	oauth2Token, err := a.oauthCfg.Exchange(a.ctx, r.URL.Query().Get("code"))
 	if err != nil {
@@ -96,13 +127,18 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 	// Extract the ID Token from OAuth2 token.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, err
+		return nil, errors.New("No 'id_token' returned by the provider")
 	}
 
 	// Parse and verify ID Token payload.
 	idToken, err := a.verifier.Verify(a.ctx, rawIDToken)
 	if err != nil {
 		return nil, err
+	}
+
+	// the ID token must have been issued for the nonce bound to this state
+	if subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(record.Nonce)) != 1 {
+		return nil, errors.New("ID token nonce does not match the nonce for this flow")
 	}
 
 	// parse the claims from the token
@@ -164,23 +200,83 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 	}
 
 	result.User.Roles = apiutil.FilterUserRolesByNames(roles, boundRoles)
-	fmt.Println("Saving claims to state key", stateKey)
 
 	// save the claims to the secret backend, they will be retrieved on the next POST
 	// for this state.
 	return nil, a.marshalClaimsToSecret(stateKey, result)
 }
 
+// startFlow registers a pending flow for the given state with a fresh nonce and
+// returns the redirect to the provider.
+func (a *AuthProvider) startFlow(stateKey, state string) (*types.AuthResult, error) {
+	nonce, err := newNonce()
+	if err != nil {
+		return nil, err
+	}
+	if err := a.writeStateRecord(stateKey, &stateRecord{
+		Nonce:     nonce,
+		ExpiresAt: time.Now().Add(pendingFlowTTL),
+	}); err != nil {
+		return nil, err
+	}
+	return &types.AuthResult{RedirectURL: a.authCodeURL(state, nonce)}, nil
+}
+
+// authCodeURL builds the provider redirect for the given state and nonce. Offline
+// access is requested so we get a refresh token for renewing internal tokens.
+func (a *AuthProvider) authCodeURL(state, nonce string) string {
+	return a.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline, gooidc.Nonce(nonce))
+}
+
 func (a *AuthProvider) marshalClaimsToSecret(stateKey string, result *types.AuthResult) error {
+	return a.writeStateRecord(stateKey, &stateRecord{
+		ExpiresAt: time.Now().Add(authorizedClaimsTTL),
+		Result:    result,
+	})
+}
+
+// readStateRecord returns the record for the given key, or nil if none exists.
+func (a *AuthProvider) readStateRecord(stateKey string) (*stateRecord, error) {
+	data, err := a.secrets.ReadSecret(stateKey, false)
+	if err != nil {
+		if errors.IsSecretNotFoundError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	record := &stateRecord{}
+	if err := json.Unmarshal(data, record); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func (a *AuthProvider) writeStateRecord(stateKey string, record *stateRecord) error {
+	out, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
 	if err := a.secrets.Lock(15); err != nil {
 		return err
 	}
 	defer a.secrets.Release()
-	out, err := json.Marshal(result)
-	if err != nil {
+	return a.secrets.WriteSecret(stateKey, out)
+}
+
+func (a *AuthProvider) deleteStateRecord(stateKey string) error {
+	if err := a.secrets.Lock(15); err != nil {
 		return err
 	}
-	return a.secrets.WriteSecret(stateKey, out)
+	defer a.secrets.Release()
+	return a.secrets.WriteSecret(stateKey, nil)
+}
+
+func newNonce() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 func getStateSecretKey(state string) string {

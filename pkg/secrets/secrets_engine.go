@@ -57,6 +57,8 @@ type SecretEngine struct {
 	client client.Client
 	// the local value cache
 	cache map[string]*cacheItem
+	// guards cache
+	cacheMux sync.RWMutex
 	// mux for local-process locking
 	mux sync.Mutex
 	// a pointer used for remote locks
@@ -115,6 +117,8 @@ func (s *SecretEngine) Setup(c client.Client, cluster *appv1.VDICluster) error {
 // readCache will return the contents of a secret from the cache if still valid.
 // Otherwise it returns nil.
 func (s *SecretEngine) readCache(name string) []byte {
+	s.cacheMux.RLock()
+	defer s.cacheMux.RUnlock()
 	if cached, ok := s.cache[name]; ok {
 		if cached.expiresAt > time.Now().Unix() {
 			return cached.contents
@@ -126,6 +130,8 @@ func (s *SecretEngine) readCache(name string) []byte {
 // readCacheMap will return the contents of a secret from the cache if still valid.
 // Otherwise it returns nil.
 func (s *SecretEngine) readCacheMap(name string) map[string][]byte {
+	s.cacheMux.RLock()
+	defer s.cacheMux.RUnlock()
 	if cached, ok := s.cache[name]; ok {
 		if cached.expiresAt > time.Now().Unix() {
 			return cached.contentsMap
@@ -137,6 +143,8 @@ func (s *SecretEngine) readCacheMap(name string) map[string][]byte {
 // writeCache writes a new bytes value to the cache, replacing an existing one of the
 // same name.
 func (s *SecretEngine) writeCache(name string, contents []byte) {
+	s.cacheMux.Lock()
+	defer s.cacheMux.Unlock()
 	s.cache[name] = &cacheItem{
 		contents:  contents,
 		expiresAt: time.Now().Add(s.cacheTTL).Unix(),
@@ -146,6 +154,8 @@ func (s *SecretEngine) writeCache(name string, contents []byte) {
 // writeCacheMap writes a new map value to the cache, replacing an existing one of the
 // same name.
 func (s *SecretEngine) writeCacheMap(name string, contents map[string][]byte) {
+	s.cacheMux.Lock()
+	defer s.cacheMux.Unlock()
 	s.cache[name] = &cacheItem{
 		contentsMap: contents,
 		expiresAt:   time.Now().Add(s.cacheTTL).Unix(),
