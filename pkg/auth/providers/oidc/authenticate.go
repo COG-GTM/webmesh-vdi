@@ -75,10 +75,14 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 		if err != nil {
 			return nil, err
 		}
-		if record == nil || record.Result == nil || record.expired() {
-			// No verified claims for this state (never started, still pending, or stale):
-			// register a fresh flow and return the oauth redirect.
+		if record == nil || record.expired() {
+			// never started or stale: register a fresh flow and return the oauth redirect.
 			return a.startFlow(stateKey, req.GetState())
+		}
+		if record.Result == nil {
+			// still pending: re-issue the redirect with the same nonce so an in-flight
+			// provider callback remains valid.
+			return &types.AuthResult{RedirectURL: a.authCodeURL(req.GetState(), record.Nonce)}, nil
 		}
 		// claims are single-use, clear the state secret for this auth session
 		if err := a.deleteStateRecord(stateKey); err != nil {
@@ -211,11 +215,13 @@ func (a *AuthProvider) startFlow(stateKey, state string) (*types.AuthResult, err
 	}); err != nil {
 		return nil, err
 	}
-	return &types.AuthResult{
-		// Use offline access to get a refresh token that we can use to generate new
-		// internal access tokens for the user.
-		RedirectURL: a.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline, gooidc.Nonce(nonce)),
-	}, nil
+	return &types.AuthResult{RedirectURL: a.authCodeURL(state, nonce)}, nil
+}
+
+// authCodeURL builds the provider redirect for the given state and nonce. Offline
+// access is requested so we get a refresh token for renewing internal tokens.
+func (a *AuthProvider) authCodeURL(state, nonce string) string {
+	return a.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline, gooidc.Nonce(nonce))
 }
 
 func (a *AuthProvider) marshalClaimsToSecret(stateKey string, result *types.AuthResult) error {
@@ -227,7 +233,7 @@ func (a *AuthProvider) marshalClaimsToSecret(stateKey string, result *types.Auth
 
 // readStateRecord returns the record for the given key, or nil if none exists.
 func (a *AuthProvider) readStateRecord(stateKey string) (*stateRecord, error) {
-	data, err := a.secrets.ReadSecret(stateKey, true)
+	data, err := a.secrets.ReadSecret(stateKey, false)
 	if err != nil {
 		if errors.IsSecretNotFoundError(err) {
 			return nil, nil
