@@ -105,13 +105,17 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 	if err != nil {
 		return nil, err
 	}
-	if record == nil || record.Result != nil || record.expired() {
+	if record == nil || record.expired() {
 		if record != nil {
 			if err := a.deleteStateRecord(stateKey); err != nil {
 				return nil, err
 			}
 		}
 		return nil, errors.New("Unknown or expired 'state' in the callback")
+	}
+	if record.Result != nil {
+		// a duplicate callback must not clobber claims the client has yet to redeem
+		return nil, errors.New("Flow for this 'state' has already completed")
 	}
 
 	// get the oauth token from the provider
