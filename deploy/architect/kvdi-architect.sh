@@ -277,15 +277,21 @@ EOF
 
     # If no CA is provided, ask if disabling TLS verification
     if [[ "${ca//[[:blank:]]/}" == "" ]] ; then
+        write-to-values "vdi.spec.auth.ldapAuth.tlsCACert" ""
         do-dialog --defaultno  --yesno "Disable TLS Verification?" 0 0
         if [[ "${?}" == "0" ]] ; then
             write-to-values \
               "vdi.spec.auth.ldapAuth.tlsInsecureSkipVerify" true
+        else
+            write-to-values \
+              "vdi.spec.auth.ldapAuth.tlsInsecureSkipVerify" false
         fi
-    # CA is provided so write it to the values
-    elif [[ "${ca//[[:blank:]]/}" != "" ]] ; then
+    # CA is provided so write it to the values and keep verification enabled
+    else
         write-to-values \
           "vdi.spec.auth.ldapAuth.tlsCACert" "$(echo "${ca}" | base64 --wrap=0)"
+        write-to-values \
+          "vdi.spec.auth.ldapAuth.tlsInsecureSkipVerify" false
     fi
 
     write-to-values "vdi.spec.auth.ldapAuth.URL" "${url}"
