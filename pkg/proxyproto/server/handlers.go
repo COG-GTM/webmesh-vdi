@@ -34,12 +34,10 @@ import (
 
 	"github.com/kennygrant/sanitize"
 
-	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/audio"
 	"github.com/kvdi/kvdi/pkg/audio/pa"
 	"github.com/kvdi/kvdi/pkg/proxyproto"
 	"github.com/kvdi/kvdi/pkg/types"
-	"github.com/kvdi/kvdi/pkg/util/common"
 	"github.com/kvdi/kvdi/pkg/util/errors"
 )
 
@@ -200,13 +198,14 @@ func (p *Server) handleStat(conn *proxyproto.Conn) {
 	}
 	p.log.Info(req.String())
 
-	path, err := getLocalPathFromRequest(req.Path)
+	f, err := openHomePath(req.Path)
 	if err != nil {
 		p.log.Error(err, "Could not retrieve path from request")
 		conn.WriteError(err)
 		return
 	}
-	finfo, err := os.Stat(path)
+	defer f.Close()
+	finfo, err := f.Stat()
 	if err != nil {
 		conn.WriteError(err)
 		return
@@ -219,7 +218,7 @@ func (p *Server) handleStat(conn *proxyproto.Conn) {
 	}
 	if finfo.IsDir() {
 		resp.Stat.Contents = make([]*types.FileStat, 0)
-		files, err := os.ReadDir(path)
+		files, err := f.ReadDir(-1)
 		if err != nil {
 			conn.WriteError(err)
 			return
@@ -272,25 +271,26 @@ func (p *Server) handleGet(conn *proxyproto.Conn) {
 	}
 	p.log.Info(req.String())
 
-	path, err := getLocalPathFromRequest(req.Path)
+	f, err := openHomePath(req.Path)
 	if err != nil {
 		p.log.Error(err, "Could not retrieve path from request")
 		conn.WriteError(err)
 		return
 	}
+	defer f.Close()
 
-	finfo, err := os.Stat(path)
+	finfo, err := f.Stat()
 	if err != nil {
 		conn.WriteError(err)
 		return
 	}
 
 	if finfo.IsDir() {
-		serveDir(conn, path)
+		serveDir(conn, f)
 		return
 	}
 
-	serveFile(conn, finfo, path)
+	serveFile(conn, finfo, f)
 }
 
 func (p *Server) handlePut(conn *proxyproto.Conn) {
@@ -304,20 +304,7 @@ func (p *Server) handlePut(conn *proxyproto.Conn) {
 	}
 	p.log.Info(req.String())
 
-	uploadDir := filepath.Join(v1.DesktopHomeMntPath, "Uploads")
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		conn.WriteError(err)
-		return
-	}
-	if err := os.Chown(uploadDir, p.opts.FSUserID, p.opts.FSUserID); err != nil {
-		conn.WriteError(err)
-		return
-	}
-
-	fName := sanitize.BaseName(req.Name)
-	dstFile := filepath.Join(uploadDir, fName)
-
-	f, err := os.Create(dstFile)
+	f, err := createUploadFile(sanitize.BaseName(req.Name), p.opts.FSUserID)
 	if err != nil {
 		conn.WriteError(err)
 		return
@@ -329,38 +316,32 @@ func (p *Server) handlePut(conn *proxyproto.Conn) {
 		return
 	}
 
-	if err := os.Chown(dstFile, p.opts.FSUserID, p.opts.FSUserID); err != nil {
-		conn.WriteError(err)
-		return
-	}
-
 	if err := conn.WriteStatus(proxyproto.RequestOK); err != nil {
 		p.log.Error(err, "Error writing OK to connection")
 	}
 }
 
-func serveDir(conn *proxyproto.Conn, path string) {
-	tarball, err := common.TarDirectoryToTempFile(path)
+func serveDir(conn *proxyproto.Conn, dir *os.File) {
+	tarball, err := tarDirToTempFile(dir)
 	if err != nil {
 		conn.WriteError(err)
 		return
 	}
-	finfo, err := os.Stat(tarball)
-	if err != nil {
-		conn.WriteError(err)
-		return
-	}
-	serveFile(conn, finfo, tarball)
-}
-
-func serveFile(conn *proxyproto.Conn, finfo os.FileInfo, path string) {
-	f, err := os.Open(path)
+	f, err := os.Open(tarball)
 	if err != nil {
 		conn.WriteError(err)
 		return
 	}
 	defer f.Close()
+	finfo, err := f.Stat()
+	if err != nil {
+		conn.WriteError(err)
+		return
+	}
+	serveFile(conn, finfo, f)
+}
 
+func serveFile(conn *proxyproto.Conn, finfo os.FileInfo, f *os.File) {
 	// Get the file header
 	hdr := make([]byte, 512)
 	if _, err := f.Read(hdr); err != nil {
