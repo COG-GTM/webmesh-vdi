@@ -65,7 +65,9 @@ func (a *AuthProvider) setTLSConfig() error {
 	var caCertPool *x509.CertPool
 	if caCert != nil {
 		caCertPool = x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return fmt.Errorf("ldap tlsCACert does not contain any valid PEM certificates")
+		}
 	}
 	u, err := url.Parse(a.cluster.GetLDAPURL())
 	if err != nil {
