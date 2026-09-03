@@ -84,6 +84,9 @@ const (
 	// DefaultSessionLength is the session length used for setting expiry
 	// times on new user sessions.
 	DefaultSessionLength = time.Duration(15) * time.Minute
+	// RefreshTokenLifetime is how long a refresh token remains redeemable after
+	// it is issued.
+	RefreshTokenLifetime = time.Duration(24) * time.Hour
 	// CACertKey is the key where the CA certificate is placed in TLS secrets.
 	CACertKey = "ca.crt"
 	// UserEnvVar is the environment variable used to set the username during a desktop's init
