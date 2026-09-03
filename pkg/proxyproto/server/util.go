@@ -123,9 +123,10 @@ func createUploadFile(name string, uid int) (*os.File, error) {
 }
 
 // tarDirToTempFile writes a gzipped tarball of the already opened directory to
-// a temporary file and returns its path. Entries are opened relative to their
-// parent descriptor with O_NOFOLLOW; symlinks and other irregular files are
-// skipped.
+// a temporary file and returns its path. The caller owns the parent directory
+// of the returned path and must remove it once done. Entries are opened
+// relative to their parent descriptor with O_NOFOLLOW; symlinks and other
+// irregular files are skipped.
 func tarDirToTempFile(dir *os.File) (string, error) {
 	targetDir, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -134,25 +135,30 @@ func tarDirToTempFile(dir *os.File) (string, error) {
 	baseDir := filepath.Base(dir.Name())
 	outFile := filepath.Join(targetDir, fmt.Sprintf("%s.tar.gz", baseDir))
 
-	fwriter, err := os.Create(outFile)
-	if err != nil {
-		return "", err
-	}
-	defer fwriter.Close()
-
-	gzw := gzip.NewWriter(fwriter)
-	defer gzw.Close()
-
-	tarball := tar.NewWriter(gzw)
-	defer tarball.Close()
-
-	if err := tarDirEntries(tarball, dir, baseDir); err != nil {
+	if err := writeTarGz(outFile, dir, baseDir); err != nil {
 		if cleanErr := os.RemoveAll(targetDir); cleanErr != nil {
 			fmt.Println("Failed to clean up failed tar directory:", cleanErr)
 		}
 		return "", err
 	}
 	return outFile, nil
+}
+
+func writeTarGz(outFile string, dir *os.File, baseDir string) error {
+	fwriter, err := os.Create(outFile)
+	if err != nil {
+		return err
+	}
+	gzw := gzip.NewWriter(fwriter)
+	tarball := tar.NewWriter(gzw)
+
+	err = tarDirEntries(tarball, dir, baseDir)
+	for _, c := range []io.Closer{tarball, gzw, fwriter} {
+		if cerr := c.Close(); err == nil {
+			err = cerr
+		}
+	}
+	return err
 }
 
 func tarDirEntries(tw *tar.Writer, dir *os.File, prefix string) error {

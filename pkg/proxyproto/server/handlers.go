@@ -327,6 +327,7 @@ func serveDir(conn *proxyproto.Conn, dir *os.File) {
 		conn.WriteError(err)
 		return
 	}
+	defer os.RemoveAll(filepath.Dir(tarball))
 	f, err := os.Open(tarball)
 	if err != nil {
 		conn.WriteError(err)
