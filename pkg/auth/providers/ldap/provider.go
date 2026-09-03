@@ -74,10 +74,8 @@ func (a *AuthProvider) Setup(c client.Client, cluster *appv1.VDICluster) error {
 		return err
 	}
 
-	if a.cluster.IsUsingLDAPOverTLS() {
-		if err = a.setTLSConfig(); err != nil {
-			return err
-		}
+	if err = a.setTLSConfig(); err != nil {
+		return err
 	}
 
 	baseDnFields := make([]string, 0)

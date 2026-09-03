@@ -191,20 +191,18 @@ function set-ldap-config() {
     esac
     url="$(get-dialog-answer)"
 
-    # If using TLS, ask if a CA is provided
-    if [[ "${url}" =~ "ldaps" ]]  ; then
-        while true ; do
-            touch "${dialogTmp}/edit"
-            do-dialog --extra-button --extra-label Reset \
-                --title "Paste the CA certificate for the LDAP user (leave empty if not required or disabling verification)" \
-                --editbox "${dialogTmp}/edit" 0 0
-            case $? in
-                0 ) break ;;
-                1 ) echo "Aborting" && exit ;;
-                3 ) continue ;;
-            esac
-        done
-    fi
+    # Both ldaps:// and ldap:// (StartTLS) verify the server certificate, so ask if a CA is provided
+    while true ; do
+        touch "${dialogTmp}/edit"
+        do-dialog --extra-button --extra-label Reset \
+            --title "Paste the CA certificate for the LDAP server (leave empty if not required or disabling verification)" \
+            --editbox "${dialogTmp}/edit" 0 0
+        case $? in
+            0 ) break ;;
+            1 ) echo "Aborting" && exit ;;
+            3 ) continue ;;
+        esac
+    done
 
     ca=$(get-dialog-answer)
 
@@ -277,17 +275,23 @@ data:
 
 EOF
 
-    # If using TLS and no CA is provided, ask if disabling TLS verification
-    if [[ "${url}" =~ "ldaps" ]] && [[ "${ca//[[:blank:]]/}" == "" ]] ; then
+    # If no CA is provided, ask if disabling TLS verification
+    if [[ "${ca//[[:blank:]]/}" == "" ]] ; then
+        write-to-values "vdi.spec.auth.ldapAuth.tlsCACert" ""
         do-dialog --defaultno  --yesno "Disable TLS Verification?" 0 0
         if [[ "${?}" == "0" ]] ; then
             write-to-values \
               "vdi.spec.auth.ldapAuth.tlsInsecureSkipVerify" true
+        else
+            write-to-values \
+              "vdi.spec.auth.ldapAuth.tlsInsecureSkipVerify" false
         fi
-    # CA is provided so write it to the values
-    elif [[ "${ca//[[:blank:]]/}" != "" ]] ; then
+    # CA is provided so write it to the values and keep verification enabled
+    else
         write-to-values \
           "vdi.spec.auth.ldapAuth.tlsCACert" "$(echo "${ca}" | base64 --wrap=0)"
+        write-to-values \
+          "vdi.spec.auth.ldapAuth.tlsInsecureSkipVerify" false
     fi
 
     write-to-values "vdi.spec.auth.ldapAuth.URL" "${url}"
