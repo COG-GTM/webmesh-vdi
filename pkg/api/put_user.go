@@ -61,6 +61,15 @@ func (d *desktopAPI) PutUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Revoke outstanding refresh tokens before the credential change lands so a
+	// revocation failure can never leave old sessions valid under the new password.
+	if req.Password != "" {
+		if err := d.revokeUserRefreshTokens(username); err != nil {
+			apiutil.ReturnAPIError(err, w)
+			return
+		}
+	}
+
 	if err := d.auth.UpdateUser(username, req); err != nil {
 		if errors.IsUserNotFoundError(err) {
 			apiutil.ReturnAPINotFound(err, w)
@@ -68,13 +77,6 @@ func (d *desktopAPI) PutUser(w http.ResponseWriter, r *http.Request) {
 		}
 		apiutil.ReturnAPIError(err, w)
 		return
-	}
-
-	if req.Password != "" {
-		if err := d.revokeUserRefreshTokens(username); err != nil {
-			apiutil.ReturnAPIError(err, w)
-			return
-		}
 	}
 
 	apiutil.WriteOK(w)

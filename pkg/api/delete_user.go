@@ -48,15 +48,15 @@ import (
 //	  "$ref": "#/responses/error"
 func (d *desktopAPI) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	username := apiutil.GetUserFromRequest(r)
+	if err := d.revokeUserRefreshTokens(username); err != nil {
+		apiutil.ReturnAPIError(err, w)
+		return
+	}
 	if err := d.auth.DeleteUser(username); err != nil {
 		if errors.IsUserNotFoundError(err) {
 			apiutil.ReturnAPINotFound(err, w)
 			return
 		}
-		apiutil.ReturnAPIError(err, w)
-		return
-	}
-	if err := d.revokeUserRefreshTokens(username); err != nil {
 		apiutil.ReturnAPIError(err, w)
 		return
 	}
