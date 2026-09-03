@@ -31,21 +31,44 @@ import (
 	"github.com/kvdi/kvdi/pkg/util/errors"
 )
 
+// homeMntPath redeclared locally for mocking
+var homeMntPath = v1.DesktopHomeMntPath
+
 func getLocalPathFromRequest(path string) (string, error) {
-	if _, err := os.Stat(v1.DesktopHomeMntPath); err != nil {
+	if _, err := os.Stat(homeMntPath); err != nil {
 		return "", errors.New("File transfer is disabled for this desktop session")
 	}
 
-	fPath := filepath.Join(v1.DesktopHomeMntPath, path)
+	root, err := filepath.EvalSymlinks(homeMntPath)
+	if err != nil {
+		return "", err
+	}
+
+	fPath := filepath.Join(homeMntPath, path)
 	absPath, err := filepath.Abs(fPath)
 	if err != nil {
 		return "", err
 	}
-	if !strings.HasPrefix(absPath, v1.DesktopHomeMntPath) {
+	if !isWithinDir(absPath, homeMntPath) {
 		// requestor tried to traverse outside the user's home directory (into proxy root fs)
 		return "", fmt.Errorf("%s is outside the user's home directory", fPath)
 	}
-	return absPath, nil
+
+	// Resolve symlinks so a link planted in the home directory cannot point the
+	// proxy at files on its own filesystem (e.g. TLS keys).
+	resolved, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return "", err
+	}
+	if !isWithinDir(resolved, root) {
+		return "", fmt.Errorf("%s resolves outside the user's home directory", fPath)
+	}
+	return resolved, nil
+}
+
+func isWithinDir(p, dir string) bool {
+	dir = filepath.Clean(dir)
+	return p == dir || strings.HasPrefix(p, dir+string(filepath.Separator))
 }
 
 func (p *Server) logConnectionMetrics(proxyType string, conn *proxyproto.Conn) chan struct{} {
