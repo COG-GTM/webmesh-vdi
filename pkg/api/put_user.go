@@ -70,6 +70,13 @@ func (d *desktopAPI) PutUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Password != "" {
+		if err := d.revokeUserRefreshTokens(username); err != nil {
+			apiutil.ReturnAPIError(err, w)
+			return
+		}
+	}
+
 	apiutil.WriteOK(w)
 }
 

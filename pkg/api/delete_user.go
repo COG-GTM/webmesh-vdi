@@ -56,5 +56,9 @@ func (d *desktopAPI) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		apiutil.ReturnAPIError(err, w)
 		return
 	}
+	if err := d.revokeUserRefreshTokens(username); err != nil {
+		apiutil.ReturnAPIError(err, w)
+		return
+	}
 	apiutil.WriteOK(w)
 }
