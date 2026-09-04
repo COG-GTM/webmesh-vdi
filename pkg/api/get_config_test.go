@@ -40,6 +40,7 @@ func TestRedactConfig(t *testing.T) {
 			},
 			OIDCAuth: &appv1.OIDCConfig{
 				IssuerURL:               "https://issuer.example.com",
+				TLSCACert:               "cacert",
 				ClientIDKey:             "oidc-clientid",
 				ClientSecretKey:         "oidc-clientsecret",
 				ClientCredentialsSecret: "oidc-creds",
@@ -61,7 +62,7 @@ func TestRedactConfig(t *testing.T) {
 		t.Error("LDAP secret references leaked")
 	}
 	o := got.Auth.OIDCAuth
-	if o.ClientIDKey != "" || o.ClientSecretKey != "" || o.ClientCredentialsSecret != "" {
+	if o.TLSCACert != "" || o.ClientIDKey != "" || o.ClientSecretKey != "" || o.ClientCredentialsSecret != "" {
 		t.Error("OIDC secret references leaked")
 	}
 	if spec.Auth.AdminSecret != "admin-secret" || spec.Secrets == nil {

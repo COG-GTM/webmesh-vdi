@@ -56,6 +56,7 @@ func redactConfig(spec *appv1.VDIClusterSpec) *appv1.VDIClusterSpec {
 			out.Auth.LDAPAuth.BindCredentialsSecret = ""
 		}
 		if out.Auth.OIDCAuth != nil {
+			out.Auth.OIDCAuth.TLSCACert = ""
 			out.Auth.OIDCAuth.ClientIDKey = ""
 			out.Auth.OIDCAuth.ClientSecretKey = ""
 			out.Auth.OIDCAuth.ClientCredentialsSecret = ""
