@@ -8,7 +8,7 @@ on:
 
 env:
   CACHE_DEP_PATH: go.sum
-  GO_VERSION: 1.21
+  GO_VERSION: "1.24"
 
 jobs:
   setup:
@@ -38,7 +38,7 @@ jobs:
       - name: Static Analysis
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.53.3
+          version: v1.64.8
           args: --timeout 10m
           skip-pkg-cache: true
 

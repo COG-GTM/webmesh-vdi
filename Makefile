@@ -64,7 +64,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.11.1
+CONTROLLER_TOOLS_VERSION ?= v0.16.5
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
@@ -237,7 +237,7 @@ push-proxy: build-proxy
 ##
 
 GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
-GOLANGCI_VERSION ?= v1.53.3
+GOLANGCI_VERSION ?= v1.64.8
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
 
