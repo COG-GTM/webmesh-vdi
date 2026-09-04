@@ -34,7 +34,34 @@ import (
 //	400: error
 //	403: error
 func (d *desktopAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
-	apiutil.WriteJSON(d.vdiCluster.Spec, w)
+	apiutil.WriteJSON(redactConfig(&d.vdiCluster.Spec), w)
+}
+
+// redactConfig returns a copy of the cluster spec with secret locations and
+// secrets-backend connection details removed. The endpoint is readable by every
+// authenticated user, so it must only expose what the UI needs.
+func redactConfig(spec *appv1.VDIClusterSpec) *appv1.VDIClusterSpec {
+	out := spec.DeepCopy()
+	out.ImagePullSecrets = nil
+	out.Secrets = nil
+	if out.App != nil {
+		out.App.TLS = nil
+	}
+	if out.Auth != nil {
+		out.Auth.AdminSecret = ""
+		if out.Auth.LDAPAuth != nil {
+			out.Auth.LDAPAuth.TLSCACert = ""
+			out.Auth.LDAPAuth.BindUserDNSecretKey = ""
+			out.Auth.LDAPAuth.BindPasswordSecretKey = ""
+			out.Auth.LDAPAuth.BindCredentialsSecret = ""
+		}
+		if out.Auth.OIDCAuth != nil {
+			out.Auth.OIDCAuth.ClientIDKey = ""
+			out.Auth.OIDCAuth.ClientSecretKey = ""
+			out.Auth.OIDCAuth.ClientCredentialsSecret = ""
+		}
+	}
+	return out
 }
 
 // Config response
