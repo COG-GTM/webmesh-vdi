@@ -4108,7 +4108,7 @@
       "type": "object",
       "properties": {
         "metadataURL": {
-          "description": "MetadataURL is the URL to the webmesh metadata endpoint. This is used for\nvalidating the JWT token.",
+          "description": "MetadataURL is the URL to the webmesh metadata endpoint. This is used for\nvalidating the JWT token. Must use the https scheme.",
           "type": "string",
           "x-go-name": "MetadataURL"
         }

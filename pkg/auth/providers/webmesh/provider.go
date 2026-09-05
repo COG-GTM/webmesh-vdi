@@ -23,6 +23,7 @@ package webmesh
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -51,6 +52,20 @@ type AuthProvider struct {
 }
 
 const metadataRequestTimeout = 10 * time.Second
+
+var errProviderNotConfigured = errors.New("webmesh auth provider is not configured")
+
+// newMetadataClient returns an HTTP client that times out and refuses to follow
+// redirects, so the forwarded bearer token is only ever sent to the configured
+// https endpoint.
+func newMetadataClient() *http.Client {
+	return &http.Client{
+		Timeout: metadataRequestTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
 
 // validateURLFor parses the configured metadata URL, requires an https scheme so
 // user bearer tokens are never forwarded in cleartext, and returns the full
@@ -89,7 +104,7 @@ func (a *AuthProvider) Setup(cli client.Client, cluster *appv1.VDICluster) error
 	a.validateURL = validateURL
 	a.cluster = cluster
 	a.client = cli
-	a.httpClient = &http.Client{Timeout: metadataRequestTimeout}
+	a.httpClient = newMetadataClient()
 	return nil
 }
 
@@ -108,6 +123,9 @@ type Claims struct {
 // Authenticate is called for API authentication requests. It should generate
 // a new JWTClaims object and serve an AuthResult back to the API.
 func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult, error) {
+	if a.httpClient == nil || a.validateURL == "" {
+		return nil, errProviderNotConfigured
+	}
 	token := req.GetRequest().Header.Get("Authorization")
 	if token == "" {
 		return nil, fmt.Errorf("no Authorization header provided")
