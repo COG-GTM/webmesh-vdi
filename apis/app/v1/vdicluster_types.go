@@ -214,7 +214,7 @@ type LocalAuthConfig struct{}
 // authentication backend.
 type WebmeshConfig struct {
 	// MetadataURL is the URL to the webmesh metadata endpoint. This is used for
-	// validating the JWT token.
+	// validating the JWT token. Must use the https scheme.
 	MetadataURL string `json:"metadataURL,omitempty"`
 }
 
