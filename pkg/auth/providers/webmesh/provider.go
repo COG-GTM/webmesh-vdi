@@ -23,10 +23,12 @@ package webmesh
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"path"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/go-logr/logr"
@@ -43,9 +45,43 @@ import (
 // authentication backend. Access to groups provided in the claims is supplied
 // through annotations on VDIRoles.
 type AuthProvider struct {
-	metadataURL string
+	validateURL string
 	cluster     *appv1.VDICluster
 	client      client.Client
+	httpClient  *http.Client
+}
+
+const metadataRequestTimeout = 10 * time.Second
+
+var errProviderNotConfigured = errors.New("webmesh auth provider is not configured")
+
+// newMetadataClient returns an HTTP client that times out and refuses to follow
+// redirects, so the forwarded bearer token is only ever sent to the configured
+// https endpoint.
+func newMetadataClient() *http.Client {
+	return &http.Client{
+		Timeout: metadataRequestTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
+// validateURLFor parses the configured metadata URL, requires an https scheme so
+// user bearer tokens are never forwarded in cleartext, and returns the full
+// id-token validation endpoint.
+func validateURLFor(metadataURL string) (string, error) {
+	u, err := url.Parse(metadataURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid webmesh metadataURL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("webmesh metadataURL must use https, got scheme %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("webmesh metadataURL %q has no host", metadataURL)
+	}
+	return u.JoinPath("id-tokens", "validate").String(), nil
 }
 
 // New returns a new AuthProvider.
@@ -61,9 +97,14 @@ func (a *AuthProvider) Reconcile(context.Context, logr.Logger, client.Client, *a
 // Setup is called when the kVDI app launches and is a chance for the provider
 // to setup any resources it needs to serve requests.
 func (a *AuthProvider) Setup(cli client.Client, cluster *appv1.VDICluster) error {
-	a.metadataURL = cluster.Spec.Auth.WebmeshAuth.MetadataURL
+	validateURL, err := validateURLFor(cluster.Spec.Auth.WebmeshAuth.MetadataURL)
+	if err != nil {
+		return err
+	}
+	a.validateURL = validateURL
 	a.cluster = cluster
 	a.client = cli
+	a.httpClient = newMetadataClient()
 	return nil
 }
 
@@ -82,16 +123,19 @@ type Claims struct {
 // Authenticate is called for API authentication requests. It should generate
 // a new JWTClaims object and serve an AuthResult back to the API.
 func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult, error) {
+	if a.httpClient == nil || a.validateURL == "" {
+		return nil, errProviderNotConfigured
+	}
 	token := req.GetRequest().Header.Get("Authorization")
 	if token == "" {
 		return nil, fmt.Errorf("no Authorization header provided")
 	}
-	r, err := http.NewRequest("GET", path.Join(a.metadataURL, "id-tokens", "validate"), nil)
+	r, err := http.NewRequest("GET", a.validateURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	r.Header.Set("Authorization", token)
-	resp, err := http.DefaultClient.Do(r)
+	resp, err := a.httpClient.Do(r)
 	if err != nil {
 		return nil, err
 	}

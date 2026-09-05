@@ -363,7 +363,7 @@ spec:
                     properties:
                       metadataURL:
                         description: MetadataURL is the URL to the webmesh metadata
-                          endpoint. This is used for validating the JWT token.
+                          endpoint. This is used for validating the JWT token. Must use the https scheme.
                         type: string
                     type: object
                 type: object
