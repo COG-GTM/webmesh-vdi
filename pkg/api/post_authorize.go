@@ -25,8 +25,6 @@ import (
 	"github.com/kvdi/kvdi/pkg/types"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
 	"github.com/kvdi/kvdi/pkg/util/errors"
-
-	"github.com/xlzd/gotp"
 )
 
 // swagger:route POST /api/authorize Auth authorizeRequest
@@ -68,9 +66,12 @@ func (d *desktopAPI) PostAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	totp := gotp.NewDefaultTOTP(secret)
-
-	if totp.Now() != req.GetOTP() {
+	ok, locked := mfaGuard.check(userSession.User.Name, secret, req.GetOTP())
+	if locked {
+		apiutil.ReturnAPIForbidden(nil, "Too many invalid MFA attempts, try again later", w)
+		return
+	}
+	if !ok {
 		apiutil.ReturnAPIForbidden(nil, "Invalid MFA Code", w)
 		return
 	}
