@@ -41,4 +41,16 @@ func TestOTPGuard(t *testing.T) {
 	if ok, locked := g.check("bob", secret, valid); !ok || locked {
 		t.Fatalf("expected valid code accepted after lockout expiry, got ok=%v locked=%v", ok, locked)
 	}
+	if _, ok := g.users["alice"]; ok {
+		t.Fatal("expected idle alice state to be pruned")
+	}
+
+	for i := 0; i < otpMaxFailures; i++ {
+		g.check("carol", secret, "000000")
+	}
+	rotated := gotp.RandomSecret(16)
+	rotatedValid := gotp.NewDefaultTOTP(rotated).At(int(now.Unix()))
+	if ok, locked := g.check("carol", rotated, rotatedValid); !ok || locked {
+		t.Fatalf("expected lockout to reset after MFA secret rotation, got ok=%v locked=%v", ok, locked)
+	}
 }

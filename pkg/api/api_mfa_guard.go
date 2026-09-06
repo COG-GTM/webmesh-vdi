@@ -20,6 +20,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"sync"
 	"time"
@@ -38,6 +39,8 @@ const (
 )
 
 type otpUserState struct {
+	secretHash   [sha256.Size]byte
+	lastSeen     time.Time
 	failures     int
 	lockedUntil  time.Time
 	lastUsedCode string
@@ -65,11 +68,15 @@ func (g *otpGuard) check(username, secret, code string) (ok bool, locked bool) {
 	defer g.mu.Unlock()
 
 	now := g.now()
+	g.prune(now)
+
+	secretHash := sha256.Sum256([]byte(secret))
 	st, exists := g.users[username]
-	if !exists {
-		st = &otpUserState{}
+	if !exists || st.secretHash != secretHash {
+		st = &otpUserState{secretHash: secretHash}
 		g.users[username] = st
 	}
+	st.lastSeen = now
 	if now.Before(st.lockedUntil) {
 		return false, true
 	}
@@ -94,4 +101,17 @@ func (g *otpGuard) check(username, secret, code string) (ok bool, locked bool) {
 	st.lastUsedCode = code
 	st.lastUsedStep = step
 	return true, false
+}
+
+// prune drops state that can no longer affect a decision: no active lockout,
+// no recent failures, and the last accepted code's time step has passed.
+func (g *otpGuard) prune(now time.Time) {
+	for name, st := range g.users {
+		if now.Before(st.lockedUntil) || now.Sub(st.lastSeen) < otpLockout {
+			continue
+		}
+		if st.lastUsedStep < now.Unix()/otpInterval {
+			delete(g.users, name)
+		}
+	}
 }
