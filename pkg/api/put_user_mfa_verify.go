@@ -22,8 +22,6 @@ package api
 import (
 	"net/http"
 
-	"github.com/xlzd/gotp"
-
 	"github.com/kvdi/kvdi/pkg/types"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
 	"github.com/kvdi/kvdi/pkg/util/errors"
@@ -74,9 +72,12 @@ func (d *desktopAPI) PutUserMFAVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	totp := gotp.NewDefaultTOTP(secret)
-
-	if totp.Now() != token {
+	ok, locked := mfaGuard.check(username, secret, token)
+	if locked {
+		apiutil.ReturnAPIForbidden(nil, "Too many invalid MFA attempts, try again later", w)
+		return
+	}
+	if !ok {
 		// just return an error, if they are already verified we don't want to
 		// change that. This way, this route can also be used by a user to simply
 		// make sure their MFA still works.
