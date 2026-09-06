@@ -52,8 +52,8 @@ func (t *Template) GetVolumes(cluster *appv1.VDICluster, desktop *Session, userd
 		{
 			Name: v1.ShmVolume,
 			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: v1.HostShmPath,
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumMemory,
 				},
 			},
 		},

@@ -131,7 +131,6 @@ var (
 
 // Desktop runtime mount paths
 const (
-	HostShmPath    = "/dev/shm"
 	HostCgroupPath = "/sys/fs/cgroup"
 
 	DesktopTmpPath     = "/tmp"
