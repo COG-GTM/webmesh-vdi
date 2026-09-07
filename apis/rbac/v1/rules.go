@@ -143,10 +143,10 @@ func (r *Rule) HasResourceType(resource Resource) bool {
 }
 
 // MatchesResourceName returns true if any of the resource patterns in this rule
-// match the given name.
+// match the given name. Patterns must match the entire name.
 func (r *Rule) MatchesResourceName(name string) bool {
 	for _, pattern := range r.ResourcePatterns {
-		re, err := regexp.Compile(pattern)
+		re, err := regexp.Compile("^(?:" + pattern + ")$")
 		if err != nil {
 			// Should have an external validator to let the user know
 			// there is a bad regex.
