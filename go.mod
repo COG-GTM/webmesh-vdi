@@ -27,7 +27,7 @@ require (
 	github.com/spf13/viper v1.9.0
 	github.com/tinyzimmer/go-glib v0.0.24
 	github.com/tinyzimmer/go-gst v0.2.31
-	github.com/xlzd/gotp v0.0.0-20181030022105-c8557ba2c119
+	github.com/xlzd/gotp v0.1.0
 	golang.org/x/crypto v0.0.0-20220208050332-20e1d8d225ab
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
