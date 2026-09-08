@@ -31,15 +31,17 @@ import (
 // ToPodSpec computes a `corev1.PodSpec` from this template given a parent cluster, user session, and optional
 // environment variable secret name.
 func (t *Template) ToPodSpec(cluster *appv1.VDICluster, instance *Session, envSecret, userdataVol string) corev1.PodSpec {
+	automountToken := instance.GetServiceAccount() != ""
 	return corev1.PodSpec{
-		Hostname:           instance.GetName(),
-		Subdomain:          instance.GetName(),
-		ServiceAccountName: instance.GetServiceAccount(),
-		SecurityContext:    t.GetPodSecurityContext(),
-		Volumes:            t.GetVolumes(cluster, instance, userdataVol),
-		ImagePullSecrets:   t.GetPullSecrets(),
-		InitContainers:     t.GetInitContainers(),
-		Containers:         t.GetContainers(cluster, instance, envSecret),
+		Hostname:                     instance.GetName(),
+		Subdomain:                    instance.GetName(),
+		ServiceAccountName:           instance.GetServiceAccount(),
+		AutomountServiceAccountToken: &automountToken,
+		SecurityContext:              t.GetPodSecurityContext(),
+		Volumes:                      t.GetVolumes(cluster, instance, userdataVol),
+		ImagePullSecrets:             t.GetPullSecrets(),
+		InitContainers:               t.GetInitContainers(),
+		Containers:                   t.GetContainers(cluster, instance, envSecret),
 	}
 }
 
