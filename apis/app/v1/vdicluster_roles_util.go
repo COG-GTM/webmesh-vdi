@@ -64,7 +64,7 @@ func (c *VDICluster) GetLaunchTemplatesRole() *rbacv1.VDIRole {
 	} else {
 		role.Rules = []rbacv1.Rule{
 			{
-				Verbs:            []rbacv1.Verb{rbacv1.VerbRead, rbacv1.VerbUse, rbacv1.VerbLaunch},
+				Verbs:            []rbacv1.Verb{rbacv1.VerbRead, rbacv1.VerbLaunch},
 				Resources:        []rbacv1.Resource{rbacv1.ResourceTemplates},
 				ResourcePatterns: []string{".*"},
 				Namespaces:       []string{c.GetCoreNamespace()},
