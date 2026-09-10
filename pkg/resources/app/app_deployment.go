@@ -103,6 +103,9 @@ func newAppContainerForCR(instance *appv1.VDICluster) corev1.Container {
 	if instance.EnableCORS() {
 		args = append(args, "--enable-cors")
 	}
+	if instance.TrustProxyHeaders() {
+		args = append(args, "--trust-proxy-headers")
+	}
 	if instance.AppTLSIsDisabled() {
 		args = append(args, "--disable-tls")
 	}

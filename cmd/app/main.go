@@ -47,10 +47,12 @@ var applogger = logf.Log.WithName("app")
 func main() {
 	var vdiCluster string
 	var enableCORS bool
+	var trustProxyHeaders bool
 	var disableTLS bool
 	flag.BoolVar(&disableTLS, "disable-tls", false, "Disable TLS")
 	flag.StringVar(&vdiCluster, "vdi-cluster", "", "The VDICluster this application is serving")
 	flag.BoolVar(&enableCORS, "enable-cors", false, "Add CORS headers to requests")
+	flag.BoolVar(&trustProxyHeaders, "trust-proxy-headers", false, "Trust X-Forwarded-For, X-Real-IP, and Forwarded headers for the client address (only when behind a trusted reverse proxy)")
 	common.ParseFlagsAndSetupLogging()
 
 	common.PrintVersion(applogger)
@@ -63,7 +65,7 @@ func main() {
 	}
 
 	// build the server
-	srvr, err := newServer(cfg, vdiCluster, enableCORS)
+	srvr, err := newServer(cfg, vdiCluster, enableCORS, trustProxyHeaders)
 	if err != nil {
 		applogger.Error(err, "Failed to build the server router")
 		os.Exit(1)
@@ -113,7 +115,7 @@ func formatLog(writer io.Writer, params handlers.LogFormatterParams) {
 	}
 }
 
-func newServer(cfg *rest.Config, vdiCluster string, enableCORS bool) (*http.Server, error) {
+func newServer(cfg *rest.Config, vdiCluster string, enableCORS, trustProxyHeaders bool) (*http.Server, error) {
 	r := mux.NewRouter()
 	// build the api router with our kubeconfig
 	apiRouter, err := api.NewFromConfig(cfg, vdiCluster)
@@ -124,11 +126,12 @@ func newServer(cfg *rest.Config, vdiCluster string, enableCORS bool) (*http.Serv
 	r.PathPrefix("/api").Handler(apiRouter)
 	// vue frontend
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("/static/")))
-	wrappedRouter := handlers.ProxyHeaders(
-		handlers.CompressHandler(
-			handlers.CustomLoggingHandler(os.Stdout, r, formatLog),
-		),
+	var wrappedRouter http.Handler = handlers.CompressHandler(
+		handlers.CustomLoggingHandler(os.Stdout, r, formatLog),
 	)
+	if trustProxyHeaders {
+		wrappedRouter = handlers.ProxyHeaders(wrappedRouter)
+	}
 	if enableCORS {
 		wrappedRouter = handlers.CORS()(wrappedRouter)
 	}

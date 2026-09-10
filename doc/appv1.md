@@ -54,6 +54,10 @@ AppConfig represents app configurations for the VDI cluster
 <td><p>Whether to add CORS headers to API requests</p></td>
 </tr>
 <tr class="odd">
+<td><code>trustProxyHeaders</code> <em>bool</em></td>
+<td><p>Whether to trust X-Forwarded-For, X-Real-IP, and Forwarded headers for the client address. Only enable when the app is deployed behind a trusted reverse proxy that overwrites these headers.</p></td>
+</tr>
+<tr class="even">
 <td><code>auditLog</code> <em>bool</em></td>
 <td><p>Whether to log auditing events to stdout</p></td>
 </tr>

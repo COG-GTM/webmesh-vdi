@@ -1539,6 +1539,9 @@ spec:
                         description: A pre-existing TLS secret to use for the HTTPS listener. If not defined, a certificate is generated.
                         type: string
                     type: object
+                  trustProxyHeaders:
+                    description: Whether to trust X-Forwarded-For, X-Real-IP, and Forwarded headers for the client address. Only enable when the app is deployed behind a trusted reverse proxy that overwrites these headers.
+                    type: boolean
                 type: object
               appNamespace:
                 description: The namespace to provision application resurces in. Defaults to the `default` namespace

@@ -107,6 +107,15 @@ func (c *VDICluster) EnableCORS() bool {
 	return false
 }
 
+// TrustProxyHeaders returns true if the app server should derive the client
+// address from X-Forwarded-For, X-Real-IP, and Forwarded headers.
+func (c *VDICluster) TrustProxyHeaders() bool {
+	if c.Spec.App != nil {
+		return c.Spec.App.TrustProxyHeaders
+	}
+	return false
+}
+
 // AuditLogEnabled returns true if auditing events should be logged to stdout.
 func (c *VDICluster) AuditLogEnabled() bool {
 	if c.Spec.App != nil {

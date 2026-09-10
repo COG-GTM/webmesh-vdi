@@ -108,6 +108,10 @@ type AppConfig struct {
 	Image string `json:"image,omitempty"`
 	// Whether to add CORS headers to API requests
 	CORSEnabled bool `json:"corsEnabled,omitempty"`
+	// Whether to trust X-Forwarded-For, X-Real-IP, and Forwarded headers for
+	// the client address. Only enable when the app is deployed behind a trusted
+	// reverse proxy that overwrites these headers.
+	TrustProxyHeaders bool `json:"trustProxyHeaders,omitempty"`
 	// Whether to log auditing events to stdout
 	AuditLog bool `json:"auditLog,omitempty"`
 	// The number of app replicas to run

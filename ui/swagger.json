@@ -1005,6 +1005,11 @@
           "type": "boolean",
           "x-go-name": "CORSEnabled"
         },
+        "trustProxyHeaders": {
+          "description": "Whether to trust X-Forwarded-For, X-Real-IP, and Forwarded headers for\nthe client address. Only enable when the app is deployed behind a trusted\nreverse proxy that overwrites these headers.",
+          "type": "boolean",
+          "x-go-name": "TrustProxyHeaders"
+        },
         "image": {
           "description": "The image to use for the app instances. Defaults to the public image\nmatching the version of the currently running manager.",
           "type": "string",
