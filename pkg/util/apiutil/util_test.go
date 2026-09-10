@@ -24,12 +24,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	rbacv1 "github.com/kvdi/kvdi/apis/rbac/v1"
 )
@@ -217,14 +219,21 @@ func TestRemoteHost(t *testing.T) {
 
 func TestClientAddrLabelRoundTrip(t *testing.T) {
 	for addr, want := range map[string]string{
-		"10.0.0.1":     "10.0.0.1",
-		"2001:db8::10": "2001-db8--10",
+		"10.0.0.1":         "10.0.0.1",
+		"::ffff:192.0.2.1": "192.0.2.1",
+		"2001:db8::10":     "2001-0db8-0000-0000-0000-0000-0000-0010",
+		"::1":              "0000-0000-0000-0000-0000-0000-0000-0001",
+		"2001:db8::":       "2001-0db8-0000-0000-0000-0000-0000-0000",
 	} {
-		if got := ClientAddrToLabel(addr); got != want {
+		got := ClientAddrToLabel(addr)
+		if got != want {
 			t.Errorf("ClientAddrToLabel(%q) = %q, want %q", addr, got, want)
 		}
-		if got := ClientAddrFromLabel(want); got != addr {
-			t.Errorf("ClientAddrFromLabel(%q) = %q, want %q", want, got, addr)
+		if errs := validation.IsValidLabelValue(got); len(errs) != 0 {
+			t.Errorf("ClientAddrToLabel(%q) = %q is not a valid label value: %v", addr, got, errs)
+		}
+		if back := ClientAddrFromLabel(got); back != net.ParseIP(addr).String() {
+			t.Errorf("ClientAddrFromLabel(%q) = %q, want %q", got, back, net.ParseIP(addr).String())
 		}
 	}
 }
