@@ -119,7 +119,7 @@ func getSessionStatus(cluster *appv1.VDICluster, desktop desktopsv1.Session, dis
 			}
 			if lock.GetLabels() != nil {
 				if clientAddr, ok := lock.Labels[v1.ClientAddrLabel]; ok {
-					status.Display.ClientAddr = clientAddr
+					status.Display.ClientAddr = apiutil.ClientAddrFromLabel(clientAddr)
 
 				} else {
 					status.Display.ClientAddr = "<unknown>"
@@ -141,7 +141,7 @@ func getSessionStatus(cluster *appv1.VDICluster, desktop desktopsv1.Session, dis
 			}
 			if lock.GetLabels() != nil {
 				if clientAddr, ok := lock.Labels[v1.ClientAddrLabel]; ok {
-					status.Audio.ClientAddr = clientAddr
+					status.Audio.ClientAddr = apiutil.ClientAddrFromLabel(clientAddr)
 
 				} else {
 					status.Audio.ClientAddr = "<unknown>"

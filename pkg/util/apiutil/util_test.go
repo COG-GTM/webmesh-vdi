@@ -214,3 +214,17 @@ func TestRemoteHost(t *testing.T) {
 		}
 	}
 }
+
+func TestClientAddrLabelRoundTrip(t *testing.T) {
+	for addr, want := range map[string]string{
+		"10.0.0.1":     "10.0.0.1",
+		"2001:db8::10": "2001-db8--10",
+	} {
+		if got := ClientAddrToLabel(addr); got != want {
+			t.Errorf("ClientAddrToLabel(%q) = %q, want %q", addr, got, want)
+		}
+		if got := ClientAddrFromLabel(want); got != addr {
+			t.Errorf("ClientAddrFromLabel(%q) = %q, want %q", want, got, addr)
+		}
+	}
+}

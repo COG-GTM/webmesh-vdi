@@ -142,3 +142,15 @@ func RemoteHost(r *http.Request) string {
 	}
 	return strings.Trim(r.RemoteAddr, "[]")
 }
+
+// ClientAddrToLabel encodes a client address so it is a valid Kubernetes label
+// value. IPv6 colons are replaced with dashes, which never appear in an IP
+// address, so the encoding is reversible with ClientAddrFromLabel.
+func ClientAddrToLabel(addr string) string {
+	return strings.ReplaceAll(addr, ":", "-")
+}
+
+// ClientAddrFromLabel reverses ClientAddrToLabel.
+func ClientAddrFromLabel(label string) string {
+	return strings.ReplaceAll(label, "-", ":")
+}
