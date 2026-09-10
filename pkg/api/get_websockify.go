@@ -71,7 +71,7 @@ func (d *desktopAPI) GetWebsockify(w http.ResponseWriter, r *http.Request) {
 		strings.Replace(apiutil.GetNamespacedNameFromRequest(r).String(), "/", "-", -1),
 	)
 	labels := d.vdiCluster.GetComponentLabels("display-lock")
-	labels[v1.ClientAddrLabel] = strings.Split(r.RemoteAddr, ":")[0] // Populated by ProxyHeaders handler wrapping the router
+	labels[v1.ClientAddrLabel] = apiutil.RemoteHost(r)
 	sessionLock := lock.New(d.client, lockName, -1).WithLabels(labels)
 
 	if err := sessionLock.Acquire(); err != nil {
@@ -123,7 +123,7 @@ func (d *desktopAPI) GetWebsockifyAudio(w http.ResponseWriter, r *http.Request) 
 		strings.Replace(apiutil.GetNamespacedNameFromRequest(r).String(), "/", "-", -1),
 	)
 	labels := d.vdiCluster.GetComponentLabels("audio-lock")
-	labels[v1.ClientAddrLabel] = strings.Split(r.RemoteAddr, ":")[0] // Populated by ProxyHeaders handler wrapping the router
+	labels[v1.ClientAddrLabel] = apiutil.RemoteHost(r)
 	sessionLock := lock.New(d.client, lockName, -1).WithLabels(labels)
 
 	if err := sessionLock.Acquire(); err != nil {

@@ -23,7 +23,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strings"
 
 	rbacv1 "github.com/kvdi/kvdi/apis/rbac/v1"
 	"github.com/kvdi/kvdi/pkg/types"
@@ -129,4 +131,14 @@ func FilterUserRolesByNames(roles []*rbacv1.VDIRole, names []string) []*types.VD
 		}
 	}
 	return userRoles
+}
+
+// RemoteHost returns the host portion of the request's RemoteAddr, handling
+// both host:port socket addresses (including bracketed IPv6) and bare
+// addresses populated by proxy-header middleware.
+func RemoteHost(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return strings.Trim(r.RemoteAddr, "[]")
 }

@@ -182,7 +182,7 @@ func doRequestMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) 
 
 func doWebsocketMetrics(next http.Handler, w *apiResponseWriter, r *http.Request) {
 	path := apiutil.GetGorillaPath(r)
-	w.clientAddr = strings.Split(r.RemoteAddr, ":")[0]
+	w.clientAddr = apiutil.RemoteHost(r)
 	w.desktopName = apiutil.GetNamespacedNameFromRequest(r).String()
 	if isDisplayWebsocket(path) {
 		// this is a display connection

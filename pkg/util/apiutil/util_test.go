@@ -200,3 +200,17 @@ func TestFilterUserRolesByName(t *testing.T) {
 		t.Error("Expected name of returned role to be 'test-role-one', got:", filtered[0].GetName())
 	}
 }
+
+func TestRemoteHost(t *testing.T) {
+	for in, want := range map[string]string{
+		"10.0.0.1:1234":        "10.0.0.1",
+		"[2001:db8::10]:54321": "2001:db8::10",
+		"10.0.0.1":             "10.0.0.1",
+		"2001:db8::10":         "2001:db8::10",
+	} {
+		r := &http.Request{RemoteAddr: in}
+		if got := RemoteHost(r); got != want {
+			t.Errorf("RemoteHost(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
