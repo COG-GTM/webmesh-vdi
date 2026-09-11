@@ -114,6 +114,9 @@ To access the app interface either do a `port-forward` (`make forward-app` is an
 
 By default there are no desktop templates configured. If you'd like, you can apply the ones in `deploy/examples/example-desktop-templates.yaml` to get started quickly.
 
+Desktop sessions are interactive, user-controlled containers and are created without any network restrictions, meaning they can reach the kVDI app, the Kubernetes API, other sessions, and the internet.
+The baseline policies in `deploy/examples/example-network-policies.yaml` deny all traffic to and from session pods and allow back only the app's proxy connections and cluster DNS; apply them (with the selectors adjusted to your cluster) to every namespace that hosts desktops, and add an explicit egress rule for anything else your desktops legitimately need.
+
 #### Bundle Manifest
 
 There is a manifest in this repository that will **just** lay down the manager instance, its dependencies, and all of the CRDs.

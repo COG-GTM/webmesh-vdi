@@ -1,0 +1,85 @@
+---
+# Baseline network segmentation for kVDI desktop sessions.
+#
+# Desktop sessions are interactive, user-controlled containers. Without a
+# NetworkPolicy they sit on the flat pod network next to the kVDI app, the
+# Kubernetes API server, the secrets backend and every other user's session.
+# The policies below deny all traffic to and from session pods and then allow
+# back only what a session needs to function:
+#
+#   * ingress from the kVDI app pods to the kvdi-proxy port (8443), which
+#     carries the display, audio and filesystem streams
+#   * egress to cluster DNS, so applications inside the desktop can resolve names
+#
+# Apply these to every namespace that hosts desktop sessions (the namespaces
+# listed in `spec.desktops.namespaces`/`userdataSpec` on your VDICluster) and
+# adjust `vdiCluster`, the app namespace and the DNS selector to match your
+# deployment. Anything else a desktop legitimately needs - internet access, an
+# internal package mirror, a file share - should be added as an explicit egress
+# rule here rather than left to the default open network.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kvdi-desktops-default-deny
+  namespace: default  # The namespace hosting desktop sessions
+spec:
+  podSelector:
+    matchLabels:
+      vdiComponent: desktop
+      vdiCluster: kvdi  # The name of your VDICluster
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kvdi-desktops-allow-proxy
+  namespace: default  # The namespace hosting desktop sessions
+spec:
+  podSelector:
+    matchLabels:
+      vdiComponent: desktop
+      vdiCluster: kvdi  # The name of your VDICluster
+  policyTypes:
+  - Ingress
+  ingress:
+  # Only the kVDI app may open display/audio/filesystem streams against the
+  # session's kvdi-proxy. Desktops cannot reach each other's proxies.
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default  # The namespace running the kVDI app
+      podSelector:
+        matchLabels:
+          vdiComponent: app
+          vdiCluster: kvdi  # The name of your VDICluster
+    ports:
+    - protocol: TCP
+      port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kvdi-desktops-allow-dns
+  namespace: default  # The namespace hosting desktop sessions
+spec:
+  podSelector:
+    matchLabels:
+      vdiComponent: desktop
+      vdiCluster: kvdi  # The name of your VDICluster
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
