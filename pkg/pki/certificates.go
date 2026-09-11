@@ -38,10 +38,14 @@ import (
 
 var ouName = []string{"kVDI"}
 
+// serialNumberBits is the width of generated certificate serial numbers. RFC 5280
+// requires serials to be unique per issuer and the CA/Browser Forum baseline
+// requirements mandate at least 64 bits of entropy.
+const serialNumberBits = 128
+
 // serialNumberLimit is the upper bound for generated certificate serial numbers.
-// RFC 5280 requires serials to be unique per issuer and the CA/Browser Forum
-// baseline requirements mandate at least 64 bits of entropy.
-var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
+// The top bit is set afterwards, keeping every serial positive and the full width.
+var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), serialNumberBits-1)
 
 func newKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, keySize)
@@ -53,7 +57,7 @@ func newSerialNumber() (*big.Int, error) {
 		return nil, fmt.Errorf("could not generate certificate serial number: %w", err)
 	}
 	// Serial numbers must be positive non-zero integers.
-	return serial.Add(serial, big.NewInt(1)), nil
+	return serial.SetBit(serial, serialNumberBits-1, 1), nil
 }
 
 func newCACertificate(cluster *appv1.VDICluster) (*x509.Certificate, error) {
