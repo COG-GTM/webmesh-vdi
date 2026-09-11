@@ -69,7 +69,10 @@ func (m *Manager) ReconcileDesktop(reqLogger logr.Logger, desktop *desktopsv1.Se
 			return err
 		}
 		// We need to create the certificate
-		desktopCert := newDesktopProxyCertificate(m.cluster, desktop, serviceIP)
+		desktopCert, err := newDesktopProxyCertificate(m.cluster, desktop, serviceIP)
+		if err != nil {
+			return err
+		}
 		privKey, err := newKey()
 		if err != nil {
 			return err
@@ -110,7 +113,10 @@ func (m *Manager) reconcileCA(reqLogger logr.Logger) (*x509.Certificate, *rsa.Pr
 			return nil, nil, err
 		}
 		reqLogger.Info("Generating new CA for the kVDI cluster")
-		ca := newCACertificate(m.cluster)
+		ca, err := newCACertificate(m.cluster)
+		if err != nil {
+			return nil, nil, err
+		}
 		caPrivKey, err := newKey()
 		if err != nil {
 			return nil, nil, err
@@ -184,7 +190,7 @@ func (m *Manager) reconcileAppCertificates(reqLogger logr.Logger, caCert *x509.C
 	// desktop pods.
 	appCertificates := []struct {
 		namespacedName types.NamespacedName
-		createCertFunc func(*appv1.VDICluster) *x509.Certificate
+		createCertFunc func(*appv1.VDICluster) (*x509.Certificate, error)
 	}{
 		{
 			namespacedName: m.cluster.GetAppServerTLSNamespacedName(),
@@ -213,7 +219,10 @@ func (m *Manager) reconcileAppCertificates(reqLogger logr.Logger, caCert *x509.C
 				return err
 			}
 			// create a new signed certificate
-			cert := appCertificate.createCertFunc(m.cluster)
+			cert, err := appCertificate.createCertFunc(m.cluster)
+			if err != nil {
+				return err
+			}
 			certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, &key.PublicKey, caPrivKey)
 			if err != nil {
 				return err

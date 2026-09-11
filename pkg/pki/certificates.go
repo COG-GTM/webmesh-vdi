@@ -26,8 +26,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
-	mrand "math/rand"
 	"net"
 	"time"
 
@@ -38,13 +38,31 @@ import (
 
 var ouName = []string{"kVDI"}
 
+// serialNumberLimit is the upper bound for generated certificate serial numbers.
+// RFC 5280 requires serials to be unique per issuer and the CA/Browser Forum
+// baseline requirements mandate at least 64 bits of entropy.
+var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
+
 func newKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, keySize)
 }
 
-func newCACertificate(cluster *appv1.VDICluster) *x509.Certificate {
+func newSerialNumber() (*big.Int, error) {
+	serial, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate certificate serial number: %w", err)
+	}
+	// Serial numbers must be positive non-zero integers.
+	return serial.Add(serial, big.NewInt(1)), nil
+}
+
+func newCACertificate(cluster *appv1.VDICluster) (*x509.Certificate, error) {
+	serial, err := newSerialNumber()
+	if err != nil {
+		return nil, err
+	}
 	return &x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName:   cluster.GetCAName(),
 			Organization: ouName,
@@ -56,12 +74,16 @@ func newCACertificate(cluster *appv1.VDICluster) *x509.Certificate {
 		KeyUsage:              caUsages,
 		BasicConstraintsValid: true,
 		DNSNames:              []string{cluster.GetCAName()},
-	}
+	}, nil
 }
 
-func newAppServerCertificate(cluster *appv1.VDICluster) *x509.Certificate {
+func newAppServerCertificate(cluster *appv1.VDICluster) (*x509.Certificate, error) {
+	serial, err := newSerialNumber()
+	if err != nil {
+		return nil, err
+	}
 	return &x509.Certificate{
-		SerialNumber: big.NewInt(int64(mrand.Intn(9999))),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName:   cluster.GetAppName(),
 			Organization: ouName,
@@ -75,12 +97,16 @@ func newAppServerCertificate(cluster *appv1.VDICluster) *x509.Certificate {
 		IPAddresses: []net.IP{
 			net.IPv4(127, 0, 0, 1),
 		},
-	}
+	}, nil
 }
 
-func newAppClientCertificate(cluster *appv1.VDICluster) *x509.Certificate {
+func newAppClientCertificate(cluster *appv1.VDICluster) (*x509.Certificate, error) {
+	serial, err := newSerialNumber()
+	if err != nil {
+		return nil, err
+	}
 	return &x509.Certificate{
-		SerialNumber: big.NewInt(3),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName:   cluster.GetAppName(),
 			Organization: ouName,
@@ -91,12 +117,16 @@ func newAppClientCertificate(cluster *appv1.VDICluster) *x509.Certificate {
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		KeyUsage:     certificateUsages,
 		ExtKeyUsage:  clientExtUsages,
-	}
+	}, nil
 }
 
-func newDesktopProxyCertificate(cluster *appv1.VDICluster, desktop *desktopsv1.Session, serviceIP string) *x509.Certificate {
+func newDesktopProxyCertificate(cluster *appv1.VDICluster, desktop *desktopsv1.Session, serviceIP string) (*x509.Certificate, error) {
+	serial, err := newSerialNumber()
+	if err != nil {
+		return nil, err
+	}
 	return &x509.Certificate{
-		SerialNumber: big.NewInt(4),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName:   serviceIP,
 			Organization: ouName,
@@ -108,7 +138,7 @@ func newDesktopProxyCertificate(cluster *appv1.VDICluster, desktop *desktopsv1.S
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		KeyUsage:     certificateUsages,
 		ExtKeyUsage:  serverExtUsages,
-	}
+	}, nil
 }
 
 // encodeTLSKeyPair returns a map of PEM encoded values for the provided TLS key pair.
