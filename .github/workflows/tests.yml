@@ -36,11 +36,10 @@ jobs:
             ~/.cache/go-build
 
       - name: Static Analysis
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: v1.53.3
+          version: v2.5.0
           args: --timeout 10m
-          skip-pkg-cache: true
 
       - name: Unit Tests
         run: make test

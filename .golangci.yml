@@ -1,16 +1,41 @@
-issues:
-  exclude-rules:
-  - path: pkg/cmd
-    linters:
-    - errcheck
-  - path: pkg/api
-    linters:
-    - deadcode
-    - unused
-    - staticcheck
-  - path: _test\.go
-    linters:
-    - errcheck
-    - staticcheck
-    - deadcode
-    - unused
+version: "2"
+linters:
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -QF*
+        - -ST*
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+        path: pkg/cmd
+      - linters:
+          - deadcode
+          - staticcheck
+          - unused
+        path: pkg/api
+      - linters:
+          - deadcode
+          - errcheck
+          - staticcheck
+          - unused
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
