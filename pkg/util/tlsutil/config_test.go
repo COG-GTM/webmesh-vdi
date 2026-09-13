@@ -22,6 +22,7 @@ package tlsutil
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"os"
 	"path/filepath"
 	"testing"
@@ -166,5 +167,26 @@ func TestClientKeypair(t *testing.T) {
 		t.Error("Got wrong cert path for client keypair:", cert)
 	} else if key != filepath.Join(clientCertMountPath, corev1.TLSPrivateKeyKey) {
 		t.Error("Got wrong key path for client keypair:", cert)
+	}
+}
+
+func TestVerifyClientOnlyCertificate(t *testing.T) {
+	mk := func(usages ...x509.ExtKeyUsage) [][]*x509.Certificate {
+		return [][]*x509.Certificate{{{ExtKeyUsage: usages}}}
+	}
+	if err := verifyClientOnlyCertificate(nil, mk(x509.ExtKeyUsageClientAuth)); err != nil {
+		t.Error("Expected client-only certificate to be accepted, got:", err)
+	}
+	if err := verifyClientOnlyCertificate(nil, mk(x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth)); err == nil {
+		t.Error("Expected certificate with ServerAuth usage to be rejected")
+	}
+	if err := verifyClientOnlyCertificate(nil, mk(x509.ExtKeyUsageServerAuth)); err == nil {
+		t.Error("Expected server-only certificate to be rejected")
+	}
+	if err := verifyClientOnlyCertificate(nil, mk(x509.ExtKeyUsageAny)); err == nil {
+		t.Error("Expected certificate with Any usage to be rejected")
+	}
+	if err := verifyClientOnlyCertificate(nil, nil); err == nil {
+		t.Error("Expected empty chain to be rejected")
 	}
 }

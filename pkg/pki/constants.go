@@ -47,4 +47,5 @@ var caUsages = x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x5
 // Extended Certificate Usages
 var clientExtUsages = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 var serverExtUsages = append(clientExtUsages, x509.ExtKeyUsageServerAuth)
+var serverOnlyExtUsages = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 var caExtUsages = append(serverExtUsages, clientExtUsages...)

@@ -61,8 +61,32 @@ func NewServerTLSConfig() (*tls.Config, error) {
 		ClientAuth:               tls.RequireAndVerifyClientCert,
 		PreferServerCipherSuites: true,
 		MinVersion:               minTLSVersion,
+		VerifyPeerCertificate:    verifyClientOnlyCertificate,
 	}
 	return tlsConfig, nil
+}
+
+// verifyClientOnlyCertificate rejects peer certificates that are also valid
+// for server authentication. Only dedicated client certificates (such as the
+// app's client keypair) may open mTLS sessions to proxy servers.
+func verifyClientOnlyCertificate(_ [][]byte, verifiedChains [][]*x509.Certificate) error {
+	if len(verifiedChains) == 0 || len(verifiedChains[0]) == 0 {
+		return errors.New("no verified client certificate presented")
+	}
+	leaf := verifiedChains[0][0]
+	hasClientAuth := false
+	for _, usage := range leaf.ExtKeyUsage {
+		switch usage {
+		case x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageAny:
+			return fmt.Errorf("client certificate %q is not a dedicated client certificate", leaf.Subject.CommonName)
+		case x509.ExtKeyUsageClientAuth:
+			hasClientAuth = true
+		}
+	}
+	if !hasClientAuth {
+		return fmt.Errorf("client certificate %q is missing client authentication usage", leaf.Subject.CommonName)
+	}
+	return nil
 }
 
 // NewClientTLSConfig returns a new client TLS configuration for use with

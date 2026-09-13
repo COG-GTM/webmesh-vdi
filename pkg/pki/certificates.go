@@ -107,7 +107,7 @@ func newDesktopProxyCertificate(cluster *appv1.VDICluster, desktop *desktopsv1.S
 		NotAfter:     time.Now().AddDate(1, 0, 0),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		KeyUsage:     certificateUsages,
-		ExtKeyUsage:  serverExtUsages,
+		ExtKeyUsage:  serverOnlyExtUsages,
 	}
 }
 
