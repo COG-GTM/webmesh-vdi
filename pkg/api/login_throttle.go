@@ -1,0 +1,141 @@
+/*
+Copyright 2020,2021 Avi Zimmerman
+
+This file is part of kvdi.
+
+kvdi is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+kvdi is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+package api
+
+import (
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	// loginMaxFailures is the number of consecutive failed login attempts for a
+	// single username or client address before further attempts are throttled.
+	loginMaxFailures = 5
+	// loginBaseLockout is the initial lockout duration once the failure
+	// threshold is reached. It doubles for every additional failure, up to
+	// loginMaxLockout.
+	loginBaseLockout = 30 * time.Second
+	loginMaxLockout  = 15 * time.Minute
+	// loginFailureWindow is how long a failure record is kept without further
+	// failures before it is discarded.
+	loginFailureWindow = time.Hour
+)
+
+type loginFailure struct {
+	count       int
+	lastFailure time.Time
+	lockedUntil time.Time
+}
+
+// loginThrottle tracks failed login attempts per username and per client
+// address and imposes an exponentially increasing lockout after repeated
+// failures.
+type loginThrottle struct {
+	mu       sync.Mutex
+	failures map[string]*loginFailure
+	now      func() time.Time
+}
+
+func newLoginThrottle() *loginThrottle {
+	return &loginThrottle{failures: make(map[string]*loginFailure), now: time.Now}
+}
+
+func loginThrottleKeys(username, clientAddr string) []string {
+	keys := make([]string, 0, 2)
+	if username != "" {
+		keys = append(keys, "user:"+strings.ToLower(username))
+	}
+	if clientAddr != "" {
+		keys = append(keys, "addr:"+clientAddr)
+	}
+	return keys
+}
+
+// isLocked returns whether login attempts for the given username or client
+// address are currently blocked, and for how much longer.
+func (t *loginThrottle) isLocked(username, clientAddr string) (bool, time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := t.now()
+	t.prune(now)
+	var remaining time.Duration
+	for _, key := range loginThrottleKeys(username, clientAddr) {
+		if f, ok := t.failures[key]; ok && f.lockedUntil.After(now) {
+			if d := f.lockedUntil.Sub(now); d > remaining {
+				remaining = d
+			}
+		}
+	}
+	return remaining > 0, remaining
+}
+
+// recordFailure registers a failed login attempt.
+func (t *loginThrottle) recordFailure(username, clientAddr string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := t.now()
+	for _, key := range loginThrottleKeys(username, clientAddr) {
+		f, ok := t.failures[key]
+		if !ok {
+			f = &loginFailure{}
+			t.failures[key] = f
+		}
+		f.count++
+		f.lastFailure = now
+		if f.count >= loginMaxFailures {
+			lockout := loginBaseLockout << uint(f.count-loginMaxFailures)
+			if lockout > loginMaxLockout || lockout <= 0 {
+				lockout = loginMaxLockout
+			}
+			f.lockedUntil = now.Add(lockout)
+		}
+	}
+}
+
+// recordSuccess clears the failure history for a username after a successful
+// login. Per-address history is intentionally retained.
+func (t *loginThrottle) recordSuccess(username string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if username != "" {
+		delete(t.failures, "user:"+strings.ToLower(username))
+	}
+}
+
+func (t *loginThrottle) prune(now time.Time) {
+	for key, f := range t.failures {
+		if now.Sub(f.lastFailure) > loginFailureWindow && !f.lockedUntil.After(now) {
+			delete(t.failures, key)
+		}
+	}
+}
+
+// clientAddrFromRequest returns the client IP for a request. Only the direct
+// peer address is used; forwarded headers are not trusted.
+func clientAddrFromRequest(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}

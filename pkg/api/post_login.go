@@ -20,6 +20,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/kvdi/kvdi/pkg/types"
@@ -75,6 +76,14 @@ func (d *desktopAPI) PostLogin(w http.ResponseWriter, r *http.Request) {
 	// is needed in the authentication flow.
 	req.SetRequest(r)
 
+	clientAddr := clientAddrFromRequest(r)
+	if locked, remaining := d.loginThrottle.isLocked(req.GetUsername(), clientAddr); locked {
+		apiLogger.Info("Rejecting login attempt due to repeated failures", "user", req.GetUsername(), "remoteAddr", clientAddr)
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(remaining.Seconds())+1))
+		apiutil.WriteOrLogError(errors.ToAPIError(errors.New("Too many failed login attempts, try again later"), errors.Forbidden).JSON(), w, http.StatusTooManyRequests)
+		return
+	}
+
 	// Pass the request to the provider
 	result, err := d.auth.Authenticate(req)
 	if err != nil {
@@ -90,11 +99,13 @@ func (d *desktopAPI) PostLogin(w http.ResponseWriter, r *http.Request) {
 			d.returnNewJWT(w, result, true, req.GetState())
 			return
 		}
+		d.loginThrottle.recordFailure(req.GetUsername(), clientAddr)
 		// If it's not an actual credential error, it will still be logged server side,
 		// but always tell the user 'Invalid credentials'.
 		apiutil.ReturnAPIForbidden(err, "Invalid credentials", w)
 		return
 	}
+	d.loginThrottle.recordSuccess(req.GetUsername())
 
 	// Check if the auth provider requires a redirect
 	if result.RedirectURL != "" {

@@ -75,6 +75,8 @@ type desktopAPI struct {
 	secrets *secrets.SecretEngine
 	// the mfa backend for setting and retrieving OTP secrets
 	mfa *mfa.Manager
+	// tracks failed login attempts to throttle brute force attacks
+	loginThrottle *loginThrottle
 }
 
 func (d *desktopAPI) handleClusterUpdate(req reconcile.Request) error {
@@ -147,7 +149,7 @@ func getClientFromConfigAndScheme(cfg *rest.Config, scheme *runtime.Scheme) (cli
 // and vdi cluster name.
 func NewFromConfig(cfg *rest.Config, vdiCluster string) (DesktopAPI, error) {
 	// create an api object
-	api := &desktopAPI{clusterName: vdiCluster}
+	api := &desktopAPI{clusterName: vdiCluster, loginThrottle: newLoginThrottle()}
 
 	// build our scheme
 	scheme, err := buildScheme()
@@ -204,7 +206,7 @@ func NewTestAPI() (srvr *http.Server, addr, adminPass string, err error) {
 	adminPass = "testing"
 
 	// create an api object
-	api := &desktopAPI{clusterName: "test-cluster"}
+	api := &desktopAPI{clusterName: "test-cluster", loginThrottle: newLoginThrottle()}
 
 	// build our scheme
 	var scheme *runtime.Scheme
