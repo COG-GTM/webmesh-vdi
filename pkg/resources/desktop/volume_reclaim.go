@@ -83,11 +83,11 @@ func (f *Reconciler) reclaimVolumes(reqLogger logr.Logger, instance *desktopsv1.
 			return err
 		}
 
-		reqLogger.Info("Freeing pv from old pvc claim")
-		if changed, err := f.freePV(pv); err != nil {
+		reqLogger.Info("Releasing pv from old pvc claim and reserving it for the user")
+		if changed, err := f.reservePV(pv, userdataReservationRef(cluster, instance.GetUser())); err != nil {
 			return err
 		} else if changed {
-			return errors.NewRequeueError("Making sure our PV is free", 5)
+			return errors.NewRequeueError("Making sure our PV is reserved", 5)
 		}
 	}
 

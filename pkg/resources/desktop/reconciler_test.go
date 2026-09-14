@@ -274,6 +274,28 @@ func TestReconcile(t *testing.T) {
 		}
 	}
 
+	// should reserve the PV for the user and requeue
+	if err := r.Reconcile(context.TODO(), testLogger, desktop); err != nil {
+		if qerr, ok := errors.IsRequeueError(err); !ok {
+			t.Error("Expected requeue error, got:", err)
+		} else if !strings.Contains(qerr.Error(), "PV is reserved") {
+			t.Error("Error should be pv reservation, got:", err)
+		}
+	} else if err == nil {
+		t.Error("Expected error got nil")
+	}
+
+	// the PV must not be left cluster-wide Available
+	if err := r.client.Get(context.TODO(), types.NamespacedName{Name: pv.Name, Namespace: metav1.NamespaceAll}, pv); err != nil {
+		t.Fatal(err)
+	}
+	if pv.Spec.ClaimRef == nil || pv.Spec.ClaimRef.UID != "" || pv.Spec.ClaimRef.Namespace != cluster.GetCoreNamespace() || pv.Spec.ClaimRef.Name != cluster.GetUserdataVolumeName(desktop.GetUser()) {
+		t.Errorf("Expected PV to be reserved for the user, got claimRef %+v", pv.Spec.ClaimRef)
+	}
+	if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
+		t.Error("Expected PV reclaim policy to be Retain")
+	}
+
 	// Reconcile should complete
 	// TODO: Again should check present resources
 	if err := r.Reconcile(context.TODO(), testLogger, desktop); err != nil {

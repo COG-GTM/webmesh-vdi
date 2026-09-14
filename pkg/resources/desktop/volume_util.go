@@ -31,20 +31,67 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (f *Reconciler) freePV(pv *corev1.PersistentVolume) (bool, error) {
+// retainPV ensures the PV will not be deleted or recycled by the storage
+// provisioner when its claim is removed.
+func (f *Reconciler) retainPV(pv *corev1.PersistentVolume) (bool, error) {
+	if pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+		return false, nil
+	}
+	pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
+	return true, f.client.Update(context.TODO(), pv)
+}
+
+// reservePV releases the PV from its current claim while keeping it pre-bound
+// to the given claim reference (with an empty UID), so that the volume can only
+// be bound by a PVC with that exact name and namespace and never by an
+// arbitrary PVC elsewhere in the cluster. Callers must ensure the PV's current
+// claim (if any) no longer exists before calling.
+func (f *Reconciler) reservePV(pv *corev1.PersistentVolume, ref *corev1.ObjectReference) (bool, error) {
 	var changed bool
 	if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
 		pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
 		changed = true
 	}
-	if pv.Spec.ClaimRef != nil {
-		pv.Spec.ClaimRef = nil
+	if !claimRefMatches(pv.Spec.ClaimRef, ref) {
+		pv.Spec.ClaimRef = &corev1.ObjectReference{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+			Namespace:  ref.Namespace,
+			Name:       ref.Name,
+		}
 		changed = true
 	}
 	if changed {
 		return changed, f.client.Update(context.TODO(), pv)
 	}
 	return changed, nil
+}
+
+func claimRefMatches(ref *corev1.ObjectReference, want *corev1.ObjectReference) bool {
+	return ref != nil && ref.Namespace == want.Namespace && ref.Name == want.Name
+}
+
+// pvClaimExists returns true if the PV's claimRef points at a PVC that still
+// exists in the cluster.
+func (f *Reconciler) pvClaimExists(pv *corev1.PersistentVolume) (bool, error) {
+	if pv.Spec.ClaimRef == nil || pv.Spec.ClaimRef.UID == "" {
+		return false, nil
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := f.client.Get(context.TODO(), types.NamespacedName{Name: pv.Spec.ClaimRef.Name, Namespace: pv.Spec.ClaimRef.Namespace}, pvc)
+	if err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+	return pvc.GetUID() == pv.Spec.ClaimRef.UID, nil
+}
+
+// userdataReservationRef returns the placeholder claim reference used to hold
+// a user's volume between desktop sessions.
+func userdataReservationRef(cluster *appv1.VDICluster, user string) *corev1.ObjectReference {
+	return &corev1.ObjectReference{
+		Namespace: cluster.GetCoreNamespace(),
+		Name:      cluster.GetUserdataVolumeName(user),
+	}
 }
 
 func (f *Reconciler) getPVCForInstance(cluster *appv1.VDICluster, instance *desktopsv1.Session) (*corev1.PersistentVolumeClaim, error) {

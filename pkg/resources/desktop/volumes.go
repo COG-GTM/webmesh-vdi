@@ -44,16 +44,41 @@ func (f *Reconciler) reconcileVolumes(ctx context.Context, reqLogger logr.Logger
 	var ok bool
 	if existingVol, ok = volMapCM.Data[instance.GetUser()]; ok {
 		reqLogger.Info("Fetching existing volume for user")
-		if err := f.client.Get(ctx, types.NamespacedName{Name: existingVol, Namespace: metav1.NamespaceAll}, &corev1.PersistentVolume{}); err != nil {
+		pv := &corev1.PersistentVolume{}
+		if err := f.client.Get(ctx, types.NamespacedName{Name: existingVol, Namespace: metav1.NamespaceAll}, pv); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				return err
 			}
 			reqLogger.Info("The volume referenced in the userdata configmap no longer exists, creating a new one")
 			existingVol = ""
+		} else if err := f.reservePVForInstance(reqLogger, cluster, instance, pv); err != nil {
+			return err
 		}
 	}
 	pvc := newPVCForUser(cluster, instance, existingVol)
 	return reconcile.PersistentVolumeClaim(ctx, reqLogger, f.client, pvc)
+}
+
+// reservePVForInstance points the user's retained volume at the PVC that is
+// about to be created for this session so that it, and only it, can bind.
+// If the volume is still bound to an existing claim it is left alone.
+func (f *Reconciler) reservePVForInstance(reqLogger logr.Logger, cluster *appv1.VDICluster, instance *desktopsv1.Session, pv *corev1.PersistentVolume) error {
+	ref := &corev1.ObjectReference{
+		Namespace: instance.GetNamespace(),
+		Name:      cluster.GetUserdataVolumeName(instance.GetUser()),
+	}
+	if claimRefMatches(pv.Spec.ClaimRef, ref) {
+		return nil
+	}
+	if exists, err := f.pvClaimExists(pv); err != nil {
+		return err
+	} else if exists {
+		reqLogger.Info("Existing volume for user is still bound to another claim, not re-reserving")
+		return nil
+	}
+	reqLogger.Info("Reserving existing volume for this session's claim")
+	_, err := f.reservePV(pv, ref)
+	return err
 }
 
 func (f *Reconciler) reconcileUserdataMapping(ctx context.Context, reqLogger logr.Logger, cluster *appv1.VDICluster, instance *desktopsv1.Session) error {
@@ -76,7 +101,7 @@ func (f *Reconciler) reconcileUserdataMapping(ctx context.Context, reqLogger log
 
 	// it won't harm the running instance and the storage class provider may
 	// leave us alone
-	if _, err := f.freePV(pv); err != nil {
+	if _, err := f.retainPV(pv); err != nil {
 		return err
 	}
 
