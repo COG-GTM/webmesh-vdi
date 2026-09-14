@@ -20,6 +20,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,12 +43,20 @@ func TestLoginThrottle(t *testing.T) {
 	if locked, remaining := th.isLocked("admin", "10.0.0.1"); !locked || remaining != loginBaseLockout {
 		t.Fatalf("expected lockout of %s, got locked=%v remaining=%s", loginBaseLockout, locked, remaining)
 	}
-	// the username is locked from any address, and the address is locked for any user
+	// the username is locked from any address, but a few failures from one
+	// (possibly shared) address do not lock out other users behind it
 	if locked, _ := th.isLocked("admin", "10.0.0.2"); !locked {
 		t.Fatal("expected username lockout to apply across addresses")
 	}
-	if locked, _ := th.isLocked("other", "10.0.0.1"); !locked {
-		t.Fatal("expected address lockout to apply across usernames")
+	if locked, _ := th.isLocked("other", "10.0.0.1"); locked {
+		t.Fatal("address should not be locked below the address threshold")
+	}
+	// password spraying many usernames from one address is eventually locked
+	for i := 0; i < loginMaxAddrFailures; i++ {
+		th.recordFailure(fmt.Sprintf("spray%d", i), "10.0.0.9")
+	}
+	if locked, _ := th.isLocked("victim", "10.0.0.9"); !locked {
+		t.Fatal("expected address lockout after spraying threshold")
 	}
 	if locked, _ := th.isLocked("other", "10.0.0.2"); locked {
 		t.Fatal("unrelated user/address should not be locked")

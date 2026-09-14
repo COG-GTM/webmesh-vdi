@@ -29,8 +29,12 @@ import (
 
 const (
 	// loginMaxFailures is the number of consecutive failed login attempts for a
-	// single username or client address before further attempts are throttled.
+	// single username before further attempts are throttled.
 	loginMaxFailures = 5
+	// loginMaxAddrFailures is the threshold for a single client address. It is
+	// deliberately much higher since many users may share one address (NAT,
+	// LoadBalancer SNAT); it only exists to bound password spraying.
+	loginMaxAddrFailures = 50
 	// loginBaseLockout is the initial lockout duration once the failure
 	// threshold is reached. It doubles for every additional failure, up to
 	// loginMaxLockout.
@@ -60,13 +64,18 @@ func newLoginThrottle() *loginThrottle {
 	return &loginThrottle{failures: make(map[string]*loginFailure), now: time.Now}
 }
 
-func loginThrottleKeys(username, clientAddr string) []string {
-	keys := make([]string, 0, 2)
+type loginThrottleKey struct {
+	key       string
+	threshold int
+}
+
+func loginThrottleKeys(username, clientAddr string) []loginThrottleKey {
+	keys := make([]loginThrottleKey, 0, 2)
 	if username != "" {
-		keys = append(keys, "user:"+strings.ToLower(username))
+		keys = append(keys, loginThrottleKey{"user:" + strings.ToLower(username), loginMaxFailures})
 	}
 	if clientAddr != "" {
-		keys = append(keys, "addr:"+clientAddr)
+		keys = append(keys, loginThrottleKey{"addr:" + clientAddr, loginMaxAddrFailures})
 	}
 	return keys
 }
@@ -79,8 +88,8 @@ func (t *loginThrottle) isLocked(username, clientAddr string) (bool, time.Durati
 	now := t.now()
 	t.prune(now)
 	var remaining time.Duration
-	for _, key := range loginThrottleKeys(username, clientAddr) {
-		if f, ok := t.failures[key]; ok && f.lockedUntil.After(now) {
+	for _, k := range loginThrottleKeys(username, clientAddr) {
+		if f, ok := t.failures[k.key]; ok && f.lockedUntil.After(now) {
 			if d := f.lockedUntil.Sub(now); d > remaining {
 				remaining = d
 			}
@@ -94,16 +103,16 @@ func (t *loginThrottle) recordFailure(username, clientAddr string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	now := t.now()
-	for _, key := range loginThrottleKeys(username, clientAddr) {
-		f, ok := t.failures[key]
+	for _, k := range loginThrottleKeys(username, clientAddr) {
+		f, ok := t.failures[k.key]
 		if !ok {
 			f = &loginFailure{}
-			t.failures[key] = f
+			t.failures[k.key] = f
 		}
 		f.count++
 		f.lastFailure = now
-		if f.count >= loginMaxFailures {
-			lockout := loginBaseLockout << uint(f.count-loginMaxFailures)
+		if f.count >= k.threshold {
+			lockout := loginBaseLockout << uint(f.count-k.threshold)
 			if lockout > loginMaxLockout || lockout <= 0 {
 				lockout = loginMaxLockout
 			}

@@ -78,7 +78,10 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 
 	// perform a bind to check the credentials
 	if err := conn.Bind(user.DN, req.Password); err != nil {
-		return nil, errors.NewInvalidCredentialsError(err.Error())
+		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
+			return nil, errors.NewInvalidCredentialsError(err.Error())
+		}
+		return nil, err
 	}
 
 	// make a new user object
