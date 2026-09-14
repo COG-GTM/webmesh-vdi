@@ -78,7 +78,7 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 
 	// perform a bind to check the credentials
 	if err := conn.Bind(user.DN, req.Password); err != nil {
-		return nil, err
+		return nil, errors.NewInvalidCredentialsError(err.Error())
 	}
 
 	// make a new user object

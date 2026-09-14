@@ -20,6 +20,8 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -77,5 +79,22 @@ func TestLoginThrottle(t *testing.T) {
 	th.isLocked("admin", "10.0.0.1")
 	if len(th.failures) != 0 {
 		t.Fatalf("expected stale failures to be pruned, got %d", len(th.failures))
+	}
+}
+
+func TestClientAddrIgnoresForwardedHeaders(t *testing.T) {
+	var got string
+	h := PeerAddrHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// simulate ProxyHeaders rewriting RemoteAddr from client-controlled headers
+		r.RemoteAddr = r.Header.Get("X-Forwarded-For")
+		got = clientAddrFromRequest(r)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/login", nil)
+	req.RemoteAddr = "10.0.0.5:4444"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	req.Header.Set(PeerAddrHeader, "9.9.9.9:1")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if got != "10.0.0.5" {
+		t.Errorf("expected peer address 10.0.0.5, got %q", got)
 	}
 }

@@ -38,6 +38,7 @@ const userAnonymous = "anonymous"
 //	200: sessionResponse
 //	400: error
 //	403: error
+//	429: error
 //	500: error
 func (d *desktopAPI) PostLogin(w http.ResponseWriter, r *http.Request) {
 
@@ -99,7 +100,9 @@ func (d *desktopAPI) PostLogin(w http.ResponseWriter, r *http.Request) {
 			d.returnNewJWT(w, result, true, req.GetState())
 			return
 		}
-		d.loginThrottle.recordFailure(req.GetUsername(), clientAddr)
+		if errors.IsInvalidCredentialsError(err) || errors.IsUserNotFoundError(err) {
+			d.loginThrottle.recordFailure(req.GetUsername(), clientAddr)
+		}
 		// If it's not an actual credential error, it will still be logged server side,
 		// but always tell the user 'Invalid credentials'.
 		apiutil.ReturnAPIForbidden(err, "Invalid credentials", w)

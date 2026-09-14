@@ -130,12 +130,31 @@ func (t *loginThrottle) prune(now time.Time) {
 	}
 }
 
+// PeerAddrHeader is set by the server entrypoint to the TCP peer address of a
+// request before any proxy-header handling rewrites RemoteAddr. It must never
+// be trusted from a client, so the entrypoint always overwrites it.
+const PeerAddrHeader = "X-Kvdi-Peer-Addr"
+
+// PeerAddrHandler records the direct peer address of every request in
+// PeerAddrHeader so throttling can use it even when RemoteAddr is later
+// replaced from client-supplied forwarding headers.
+func PeerAddrHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set(PeerAddrHeader, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // clientAddrFromRequest returns the client IP for a request. Only the direct
 // peer address is used; forwarded headers are not trusted.
 func clientAddrFromRequest(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	addr := r.Header.Get(PeerAddrHeader)
+	if addr == "" {
+		addr = r.RemoteAddr
+	}
+	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return r.RemoteAddr
+		return addr
 	}
 	return host
 }

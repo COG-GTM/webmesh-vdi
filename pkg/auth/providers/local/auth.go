@@ -20,10 +20,9 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package local
 
 import (
-	"errors"
-
 	"github.com/kvdi/kvdi/pkg/types"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
+	"github.com/kvdi/kvdi/pkg/util/errors"
 )
 
 // Authenticate implements AuthProvider and simply checks the provided password
@@ -38,7 +37,7 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 		return nil, err
 	}
 	if !localUser.PasswordMatchesHash(req.Password) {
-		return nil, errors.New("invalid credentials")
+		return nil, errors.NewInvalidCredentialsError("invalid credentials")
 	}
 	roles, err := a.cluster.GetRoles(a.client)
 	if err != nil {

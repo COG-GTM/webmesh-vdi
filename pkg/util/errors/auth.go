@@ -54,6 +54,28 @@ func IsUserNotFoundError(err error) bool {
 	return false
 }
 
+// InvalidCredentialsError is an error signaling that the supplied credentials
+// were rejected by the auth provider (as opposed to a backend failure).
+type InvalidCredentialsError struct {
+	errMsg string
+}
+
+// Error implements the error interface.
+func (r *InvalidCredentialsError) Error() string {
+	return r.errMsg
+}
+
+// NewInvalidCredentialsError returns a new InvalidCredentialsError with the given message.
+func NewInvalidCredentialsError(msg string) error {
+	return &InvalidCredentialsError{errMsg: msg}
+}
+
+// IsInvalidCredentialsError returns true if the given error interface is an InvalidCredentialsError.
+func IsInvalidCredentialsError(err error) bool {
+	_, ok := err.(*InvalidCredentialsError)
+	return ok
+}
+
 // RoleNotFoundError is an error signaling that the requested role was not found.
 type RoleNotFoundError struct {
 	errMsg string
