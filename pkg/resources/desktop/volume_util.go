@@ -68,7 +68,7 @@ func (f *Reconciler) reservePV(pv *corev1.PersistentVolume, ref *corev1.ObjectRe
 }
 
 func claimRefMatches(ref *corev1.ObjectReference, want *corev1.ObjectReference) bool {
-	return ref != nil && ref.Namespace == want.Namespace && ref.Name == want.Name
+	return ref != nil && ref.Namespace == want.Namespace && ref.Name == want.Name && ref.UID == want.UID
 }
 
 // pvClaimExists returns true if the PV's claimRef points at a PVC that still

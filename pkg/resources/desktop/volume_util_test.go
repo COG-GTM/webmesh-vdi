@@ -34,11 +34,12 @@ func TestReservePV(t *testing.T) {
 	desktop := newDesktop(t)
 	desktop.Spec.User = "alice"
 
-	// a volume left over from a session that has been deleted
+	// a volume left over from a session that has been deleted in the same
+	// namespace/name the next claim will use, but with a stale UID
 	pv := &corev1.PersistentVolume{}
 	pv.Name = "alice-volume"
 	pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimDelete
-	pv.Spec.ClaimRef = &corev1.ObjectReference{Namespace: "old-namespace", Name: cluster.GetUserdataVolumeName("alice"), UID: types.UID("gone")}
+	pv.Spec.ClaimRef = &corev1.ObjectReference{Namespace: cluster.GetCoreNamespace(), Name: cluster.GetUserdataVolumeName("alice"), UID: types.UID("gone")}
 	if err := r.client.Create(context.TODO(), pv); err != nil {
 		t.Fatal(err)
 	}
