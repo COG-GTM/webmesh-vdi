@@ -22,7 +22,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import SwaggerUIBundle from 'swagger-ui'
+import SwaggerUIBundle from 'swagger-ui-dist/swagger-ui-bundle'
 
 export default {
   name: 'APIExplorer',
@@ -60,6 +60,7 @@ export default {
       this.ui = SwaggerUIBundle({
         url: '/swagger.json',
         dom_id: '#swagger-ui',
+        queryConfigEnabled: false,
         deepLinking: false,
         displayRequestDuration: true,
         responseInterceptor: (response) => {
