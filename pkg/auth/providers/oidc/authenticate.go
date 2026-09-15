@@ -125,7 +125,8 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 		RefreshNotSupported: true,
 	}
 
-	// BADDDDD
+	// Stored server-side by the API (never embedded in the client JWT) and only
+	// exposed to desktop env templates.
 	if a.cluster.PreserveOIDCTokens() {
 		result.Data = map[string]string{
 			"access_token":  oauth2Token.AccessToken,

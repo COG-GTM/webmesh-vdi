@@ -69,6 +69,9 @@ const (
 	OTPUsersSecretKey = "otpUsers"
 	// RefreshTokensSecretKey is where a mapping of refresh tokens to users is kept in the secrets backend.
 	RefreshTokensSecretKey = "refreshTokens"
+	// SessionDataSecretKey is where per-user auth provider data (e.g. preserved OIDC tokens)
+	// is kept in the secrets backend instead of inside the client-facing JWT.
+	SessionDataSecretKey = "sessionData"
 	// WebPort is the port that web services will listen on internally
 	WebPort = 8443
 	// PublicTLSWebPort is the port for the app service

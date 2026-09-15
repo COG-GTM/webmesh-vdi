@@ -43,6 +43,11 @@ func (d *desktopAPI) PostLogout(w http.ResponseWriter, r *http.Request) {
 	// 	apiutil.ReturnAPIError(err, w)
 	// 	return
 	// }
+	if userSession := apiutil.GetRequestUserSession(r); userSession != nil && userSession.User != nil {
+		if err := d.deleteSessionData(userSession.User.GetName()); err != nil {
+			apiLogger.Error(err, "Error while clearing stored session data")
+		}
+	}
 	refreshToken, err := r.Cookie(RefreshTokenCookie)
 	if err == nil {
 		// Revoke the token and remove the cookie

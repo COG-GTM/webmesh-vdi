@@ -103,6 +103,11 @@ func (d *desktopAPI) StartDesktopSession(w http.ResponseWriter, r *http.Request)
 			}
 		}()
 		var data map[string][]byte
+		sess.Data, secretErr = d.lookupSessionData(sess.User.GetName())
+		if secretErr != nil {
+			apiutil.ReturnAPIError(secretErr, w)
+			return
+		}
 		data, secretErr = executeEnvTemplates(sess, envTemplates)
 		if secretErr != nil {
 			apiutil.ReturnAPIError(secretErr, w)

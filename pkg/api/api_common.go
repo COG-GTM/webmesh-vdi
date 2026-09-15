@@ -21,6 +21,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -49,8 +50,19 @@ func (d *desktopAPI) returnNewJWT(w http.ResponseWriter, result *types.AuthResul
 		return
 	}
 
+	// Provider data (e.g. upstream OIDC tokens) is kept server-side and never
+	// embedded in the token handed to the browser.
+	if len(result.Data) > 0 {
+		if err := d.storeSessionData(result.User.GetName(), result.Data); err != nil {
+			apiutil.ReturnAPIError(err, w)
+			return
+		}
+	}
+	clientResult := *result
+	clientResult.Data = nil
+
 	// create a new token
-	claims, newToken, err := apiutil.GenerateJWT(secret, result, authorized, d.vdiCluster.GetTokenDuration())
+	claims, newToken, err := apiutil.GenerateJWT(secret, &clientResult, authorized, d.vdiCluster.GetTokenDuration())
 	if err != nil {
 		apiutil.ReturnAPIError(err, w)
 		return
@@ -119,6 +131,61 @@ func (d *desktopAPI) lookupRefreshToken(refreshToken string) (string, error) {
 	}
 	delete(tokens, refreshToken)
 	return string(user), d.secrets.WriteSecretMap(v1.RefreshTokensSecretKey, tokens)
+}
+
+func (d *desktopAPI) storeSessionData(username string, data map[string]string) error {
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := d.secrets.Lock(10); err != nil {
+		return err
+	}
+	defer d.secrets.Release()
+	sessions, err := d.secrets.ReadSecretMap(v1.SessionDataSecretKey, false)
+	if err != nil {
+		if !errors.IsSecretNotFoundError(err) {
+			return err
+		}
+		sessions = make(map[string][]byte)
+	}
+	sessions[username] = encoded
+	return d.secrets.WriteSecretMap(v1.SessionDataSecretKey, sessions)
+}
+
+func (d *desktopAPI) lookupSessionData(username string) (map[string]string, error) {
+	sessions, err := d.secrets.ReadSecretMap(v1.SessionDataSecretKey, false)
+	if err != nil {
+		if errors.IsSecretNotFoundError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	encoded, ok := sessions[username]
+	if !ok {
+		return nil, nil
+	}
+	data := make(map[string]string)
+	return data, json.Unmarshal(encoded, &data)
+}
+
+func (d *desktopAPI) deleteSessionData(username string) error {
+	if err := d.secrets.Lock(10); err != nil {
+		return err
+	}
+	defer d.secrets.Release()
+	sessions, err := d.secrets.ReadSecretMap(v1.SessionDataSecretKey, false)
+	if err != nil {
+		if errors.IsSecretNotFoundError(err) {
+			return nil
+		}
+		return err
+	}
+	if _, ok := sessions[username]; !ok {
+		return nil
+	}
+	delete(sessions, username)
+	return d.secrets.WriteSecretMap(v1.SessionDataSecretKey, sessions)
 }
 
 func (d *desktopAPI) getDesktopProxyHost(r *http.Request) (string, error) {
