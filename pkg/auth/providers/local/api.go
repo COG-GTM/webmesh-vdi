@@ -48,6 +48,9 @@ func (a *AuthProvider) GetUsers() ([]*types.VDIUser, error) {
 
 // CreateUser implements AuthProvider and serves a POST /api/users request
 func (a *AuthProvider) CreateUser(req *types.CreateUserRequest) error {
+	if err := common.ValidatePassword(req.Password); err != nil {
+		return err
+	}
 	passwdHash, err := common.HashPassword(req.Password)
 	if err != nil {
 		return err
@@ -85,6 +88,12 @@ func (a *AuthProvider) UpdateUser(username string, req *types.UpdateUserRequest)
 		user.Groups = req.Roles
 	}
 	if req.Password != "" {
+		if _, err := a.getUser(username); err != nil {
+			return err
+		}
+		if err := common.ValidatePassword(req.Password); err != nil {
+			return err
+		}
 		passwdHash, err := common.HashPassword(req.Password)
 		if err != nil {
 			return err

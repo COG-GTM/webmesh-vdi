@@ -146,6 +146,21 @@ func GeneratePassword(length int) (string, error) {
 // hashCost is the cost to use for generating salts from passwords
 var hashCost = bcrypt.MinCost
 
+// MinPasswordLength is the minimum number of characters required for a
+// local user password.
+const MinPasswordLength = 8
+
+// ValidatePassword enforces the password policy for local users.
+func ValidatePassword(passw string) error {
+	if len(passw) < MinPasswordLength {
+		return fmt.Errorf("password must be at least %d characters", MinPasswordLength)
+	}
+	if strings.TrimSpace(passw) != passw {
+		return fmt.Errorf("password cannot begin or end with whitespace")
+	}
+	return nil
+}
+
 // HashPassword creates a salt from a password for storing in a database
 func HashPassword(passw string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(passw), hashCost)
