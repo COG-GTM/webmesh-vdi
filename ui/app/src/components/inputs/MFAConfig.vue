@@ -64,6 +64,11 @@ export default {
       finishedVerifying: false
     }
   },
+  computed: {
+    isSelf () {
+      return this.username === this.$userStore.getters.user.name
+    }
+  },
   methods: {
     setMFAData (data) {
       if (data.enabled) {
@@ -80,11 +85,29 @@ export default {
       }
     },
     enableMFA (val) {
-      this.$axios.put(`/api/users/${this.username}/mfa`, { enabled: val })
+      if (!val && this.isSelf && this.$configStore.getters.authMethod !== 'oidc') {
+        this.$q.dialog({
+          title: 'Disable MFA',
+          message: 'Enter your current password to disable MFA',
+          prompt: { model: '', type: 'password' },
+          cancel: true,
+          persistent: true
+        }).onOk((currentPassword) => {
+          this.putMFA({ enabled: false, currentPassword: currentPassword })
+        }).onCancel(() => {
+          this.enabled = true
+        })
+        return
+      }
+      this.putMFA({ enabled: val })
+    },
+    putMFA (payload) {
+      this.$axios.put(`/api/users/${this.username}/mfa`, payload)
         .then((res) => {
           this.setMFAData(res.data)
         })
         .catch((err) => {
+          this.enabled = !payload.enabled
           this.$root.$emit('notify-error', err)
         })
     },

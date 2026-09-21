@@ -36,6 +36,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
             </div>
           </q-card-section>
           <q-card-section>
+            <q-input v-if="!isOIDC" dense type="password" label="Current password" v-model="currentPassword" :disable="passwordSubmitDisabled" />
             <PasswordInput ref="password" :startDisabled="true" />
             <q-btn :disabled="passwordSubmitDisabled" color="primary" flat label="Cancel" @click="resetPasswordInput" />
             <q-btn :disabled="passwordSubmitDisabled" color="primary" flat label="Update" @click="doUpdatePassword" />
@@ -74,18 +75,23 @@ export default {
   beforeDestroy () { this.$root.$off('edit-password', this.setEditPassword) },
   data () {
     return {
-      passwordSubmitDisabled: true
+      passwordSubmitDisabled: true,
+      currentPassword: ''
     }
   },
   computed: {
     username () {
       return this.$userStore.getters.user.name
+    },
+    isOIDC () {
+      return this.$configStore.getters.authMethod === 'oidc'
     }
   },
   methods: {
     resetPasswordInput () {
       this.$refs.password.passwordIsDisabled = true
       this.passwordSubmitDisabled = true
+      this.currentPassword = ''
       this.$refs.password.password = '*****************************'
     },
     setEditPassword () {
@@ -94,7 +100,8 @@ export default {
     async doUpdatePassword () {
       if (this.$refs.password.passwordIsDisabled) { return }
       const payload = {
-        password: this.$refs.password.password
+        password: this.$refs.password.password,
+        currentPassword: this.currentPassword
       }
       const user = this.username
       try {

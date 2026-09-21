@@ -95,6 +95,11 @@ func (d *desktopAPI) PutUserMFA(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// We are disabling MFA
+	if d.requiresReauth(r, username) {
+		if !d.verifyCurrentPassword(w, r, username, req.CurrentPassword) {
+			return
+		}
+	}
 	if err := d.mfa.DeleteUserSecret(username); err != nil {
 		apiutil.ReturnAPIError(err, w)
 		return

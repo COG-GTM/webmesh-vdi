@@ -131,6 +131,9 @@ func (r *CreateUserRequest) Validate() error {
 type UpdateUserRequest struct {
 	// When populated, will change the password for the user.
 	Password string `json:"password"`
+	// The user's current password. Required when a user changes their own
+	// password and the auth provider supports password authentication.
+	CurrentPassword string `json:"currentPassword"`
 	// When populated will change the roles for the user.
 	Roles []string `json:"roles"`
 }
@@ -148,6 +151,9 @@ func (r *UpdateUserRequest) Validate() error {
 type UpdateMFARequest struct {
 	// When set, will enable MFA for the given user. If false, will disable MFA.
 	Enabled bool `json:"enabled"`
+	// The user's current password. Required when a user disables MFA on their
+	// own account and the auth provider supports password authentication.
+	CurrentPassword string `json:"currentPassword"`
 }
 
 // MFAResponse contains the response to an UpdateMFARequest or GetMFARequest.

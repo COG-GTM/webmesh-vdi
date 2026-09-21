@@ -61,6 +61,12 @@ func (d *desktopAPI) PutUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Password != "" && d.requiresReauth(r, username) {
+		if !d.verifyCurrentPassword(w, r, username, req.CurrentPassword) {
+			return
+		}
+	}
+
 	if err := d.auth.UpdateUser(username, req); err != nil {
 		if errors.IsUserNotFoundError(err) {
 			apiutil.ReturnAPINotFound(err, w)
