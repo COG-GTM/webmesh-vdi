@@ -33,6 +33,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/crypto/bcrypt"
@@ -152,7 +153,7 @@ const MinPasswordLength = 8
 
 // ValidatePassword enforces the password policy for local users.
 func ValidatePassword(passw string) error {
-	if len(passw) < MinPasswordLength {
+	if utf8.RuneCountInString(passw) < MinPasswordLength {
 		return fmt.Errorf("password must be at least %d characters", MinPasswordLength)
 	}
 	if strings.TrimSpace(passw) != passw {
