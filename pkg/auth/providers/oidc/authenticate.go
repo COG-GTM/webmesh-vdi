@@ -20,6 +20,8 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 package oidc
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -117,6 +119,10 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 		return nil, err
 	}
 
+	if err := a.bindUsernameToSubject(username, idToken.Issuer, idToken.Subject); err != nil {
+		return nil, err
+	}
+
 	result := &types.AuthResult{
 		User: &types.VDIUser{
 			Name:  username,
@@ -183,6 +189,45 @@ func (a *AuthProvider) marshalClaimsToSecret(stateKey string, result *types.Auth
 	return a.secrets.WriteSecret(stateKey, out)
 }
 
+// bindUsernameToSubject ensures a kVDI username is only ever issued to a single
+// OIDC identity (issuer + subject). The first identity to claim a username is
+// recorded in the secrets backend and any other identity presenting the same
+// username is rejected.
+func (a *AuthProvider) bindUsernameToSubject(username, issuer, subject string) error {
+	if subject == "" {
+		return errors.New("ID token is missing the 'sub' claim")
+	}
+	identity := subjectIdentity(issuer, subject)
+	key := getSubjectSecretKey(username)
+	if err := a.secrets.Lock(15); err != nil {
+		return err
+	}
+	defer a.secrets.Release()
+	existing, err := a.secrets.ReadSecret(key, false)
+	if err != nil {
+		if !errors.IsSecretNotFoundError(err) {
+			return err
+		}
+		return a.secrets.WriteSecret(key, []byte(identity))
+	}
+	if len(existing) == 0 {
+		return a.secrets.WriteSecret(key, []byte(identity))
+	}
+	if string(existing) != identity {
+		return fmt.Errorf("username %q is already bound to a different OIDC identity", username)
+	}
+	return nil
+}
+
+func subjectIdentity(issuer, subject string) string {
+	return fmt.Sprintf("%s|%s", issuer, subject)
+}
+
+func getSubjectSecretKey(username string) string {
+	sum := sha256.Sum256([]byte(username))
+	return fmt.Sprintf("oidc_subject_%s", hex.EncodeToString(sum[:]))
+}
+
 func getStateSecretKey(state string) string {
 	return fmt.Sprintf("oidc_%s", state)
 }
@@ -211,6 +256,11 @@ func getUsernameFromClaims(claims map[string]interface{}) (string, error) {
 	}
 	if email, ok := claims["email"]; ok {
 		if emailStr, ok := email.(string); ok {
+			if verified, ok := claims["email_verified"]; ok {
+				if verifiedBool, ok := verified.(bool); !ok || !verifiedBool {
+					return "", errors.New("email claim is not verified by the OIDC provider")
+				}
+			}
 			return strings.Split(emailStr, "@")[0], nil
 		}
 	}
