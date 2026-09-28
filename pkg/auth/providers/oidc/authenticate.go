@@ -119,10 +119,6 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 		return nil, err
 	}
 
-	if err := a.bindUsernameToSubject(username, idToken.Issuer, idToken.Subject); err != nil {
-		return nil, err
-	}
-
 	result := &types.AuthResult{
 		User: &types.VDIUser{
 			Name:  username,
@@ -148,7 +144,7 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 		// allows the user in anyway.
 		if a.cluster.AllowNonGroupedReadOnly() {
 			result.User.Roles = []*types.VDIUserRole{rbac.VDIRoleToUserRole(a.cluster.GetLaunchTemplatesRole())}
-			return nil, a.marshalClaimsToSecret(stateKey, result)
+			return nil, a.completeLogin(stateKey, result, idToken.Issuer, idToken.Subject)
 		}
 		return nil, errors.New("No groups provided in claims and allow non-grouped users is set to false")
 	}
@@ -174,7 +170,14 @@ func (a *AuthProvider) Authenticate(req *types.LoginRequest) (*types.AuthResult,
 
 	// save the claims to the secret backend, they will be retrieved on the next POST
 	// for this state.
-	return nil, a.marshalClaimsToSecret(stateKey, result)
+	return nil, a.completeLogin(stateKey, result, idToken.Issuer, idToken.Subject)
+}
+
+func (a *AuthProvider) completeLogin(stateKey string, result *types.AuthResult, issuer, subject string) error {
+	if err := a.bindUsernameToSubject(result.User.Name, issuer, subject); err != nil {
+		return err
+	}
+	return a.marshalClaimsToSecret(stateKey, result)
 }
 
 func (a *AuthProvider) marshalClaimsToSecret(stateKey string, result *types.AuthResult) error {
@@ -220,7 +223,8 @@ func (a *AuthProvider) bindUsernameToSubject(username, issuer, subject string) e
 }
 
 func subjectIdentity(issuer, subject string) string {
-	return fmt.Sprintf("%s|%s", issuer, subject)
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s", issuer, subject)))
+	return hex.EncodeToString(sum[:])
 }
 
 func getSubjectSecretKey(username string) string {

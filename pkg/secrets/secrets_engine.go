@@ -233,7 +233,11 @@ func (s *SecretEngine) Lock(timeoutSeconds int) error {
 	if *s.cluster.GetAppReplicas() > 1 {
 		// remote lock to be held against peers
 		s.lock = lock.New(s.client, s.cluster.GetAppSecretsName(), time.Duration(timeoutSeconds)*time.Second)
-		return s.lock.Acquire()
+		if err := s.lock.Acquire(); err != nil {
+			s.lock = nil
+			s.mux.Unlock()
+			return err
+		}
 	}
 
 	return nil
