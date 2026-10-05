@@ -216,6 +216,16 @@ func TestUserRoleNameInjection(t *testing.T) {
 		}
 	}
 
+	for _, username := range []string{"eve,x", "eve\nmallory", "eve\rmallory", "eve:x"} {
+		if err := admin.CreateVDIUser(&types.CreateUserRequest{
+			Username: username,
+			Password: "evepass",
+			Roles:    []string{"test-cluster-launch-templates"},
+		}); err == nil {
+			t.Errorf("Expected user creation with username %q to be rejected", username)
+		}
+	}
+
 	bob, err := client.New(&client.Opts{URL: opts.URL, Username: "bob", Password: "bobpass"})
 	if err != nil {
 		t.Fatal(err)
