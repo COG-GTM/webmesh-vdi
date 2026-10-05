@@ -26,6 +26,8 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/validation"
+
 	metav1 "github.com/kvdi/kvdi/apis/meta/v1"
 	rbacv1 "github.com/kvdi/kvdi/apis/rbac/v1"
 )
@@ -119,10 +121,10 @@ func (r *CreateUserRequest) Validate() error {
 	if r.Roles == nil || len(r.Roles) == 0 {
 		return errors.New("You must assign at least one role to the user")
 	}
-	if strings.Contains(r.Username, ":") {
-		return errors.New("Username cannot contain the ':' character")
+	if strings.ContainsAny(r.Username, ":,\r\n") {
+		return errors.New("Username cannot contain ':', ',' or newline characters")
 	}
-	return nil
+	return validateRoleNames(r.Roles)
 }
 
 // UpdateUserRequest requests updates to an existing user. Not all auth
@@ -139,6 +141,16 @@ type UpdateUserRequest struct {
 func (r *UpdateUserRequest) Validate() error {
 	if r.Password == "" && len(r.Roles) == 0 {
 		return errors.New("You must specify either a new password or a list of roles")
+	}
+	return validateRoleNames(r.Roles)
+}
+
+// validateRoleNames ensures each role is a valid VDIRole (Kubernetes object) name.
+func validateRoleNames(roles []string) error {
+	for _, role := range roles {
+		if errs := validation.IsDNS1123Subdomain(role); len(errs) > 0 {
+			return fmt.Errorf("Invalid role name %q: %s", role, strings.Join(errs, ", "))
+		}
 	}
 	return nil
 }

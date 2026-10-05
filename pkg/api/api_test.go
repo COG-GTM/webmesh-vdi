@@ -184,3 +184,60 @@ func TestUsers(t *testing.T) {
 	}
 
 }
+
+func TestUserRoleNameInjection(t *testing.T) {
+	srvr, opts := mustNewTestAPI(t)
+	defer srvr.Close()
+	admin, err := client.New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+
+	if err := admin.CreateVDIUser(&types.CreateUserRequest{
+		Username: "bob",
+		Password: "bobpass",
+		Roles:    []string{"test-cluster-launch-templates"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, roles := range [][]string{
+		{"x,test-cluster-admin"},
+		{"x\nmallory:test-cluster-admin:hash"},
+		{"x:test-cluster-admin"},
+	} {
+		if err := admin.CreateVDIUser(&types.CreateUserRequest{
+			Username: "eve",
+			Password: "evepass",
+			Roles:    roles,
+		}); err == nil {
+			t.Errorf("Expected user creation with roles %q to be rejected", roles)
+		}
+	}
+
+	bob, err := client.New(&client.Opts{URL: opts.URL, Username: "bob", Password: "bobpass"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bob.Close()
+
+	for _, roles := range [][]string{
+		{"x,test-cluster-admin"},
+		{"x\nbob:test-cluster-admin:hash"},
+	} {
+		if err := bob.UpdateVDIUser("bob", &types.UpdateUserRequest{Roles: roles}); err == nil {
+			t.Errorf("Expected self-update with roles %q to be rejected", roles)
+		}
+	}
+
+	user, err := admin.GetVDIUser("bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range user.Roles {
+		if role.Name == "test-cluster-admin" {
+			t.Fatal("bob was able to assign himself the admin role")
+		}
+	}
+}
