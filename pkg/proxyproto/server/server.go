@@ -112,7 +112,8 @@ func (p *Server) handler(rt proxyproto.RequestType) Handler {
 func (p *Server) handleConn(c net.Conn) {
 	pc, err := proxyproto.NewConn(p.log, c)
 	if err != nil {
-		p.log.Error(err, "Error initiating new client connection")
+		p.log.Error(err, "Error initiating new client connection", "Client", c.RemoteAddr().String())
+		return
 	}
 	p.log.Info("Serving new request", "Type", pc.RequestType().String(), "Client", pc.Conn.RemoteAddr().String())
 	hdlr := p.handler(pc.RequestType())
