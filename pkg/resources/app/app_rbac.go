@@ -52,6 +52,18 @@ var appRules = []rbacv1.PolicyRule{
 		Verbs:     verbsReadOnly,
 	},
 	{
+		// The API creates per-session env secrets in desktop namespaces. It never
+		// needs to read or modify secrets outside of its own namespace.
+		APIGroups: []string{""},
+		Resources: []string{"secrets"},
+		Verbs:     []string{"create"},
+	},
+}
+
+// appNamespacedRules are only granted in the core namespace where the app
+// stores its secrets backend, auth credentials and display/audio locks.
+var appNamespacedRules = []rbacv1.PolicyRule{
+	{
 		APIGroups: []string{""},
 		Resources: []string{"configmaps", "secrets"},
 		Verbs:     verbsAll,
@@ -101,6 +113,43 @@ func newRoleBindingsForCR(instance *appv1.VDICluster) *rbacv1.ClusterRoleBinding
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
+			Name:     instance.GetAppName(),
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+}
+
+func newAppRoleForCR(instance *appv1.VDICluster) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            instance.GetAppName(),
+			Namespace:       instance.GetCoreNamespace(),
+			Labels:          instance.GetComponentLabels("app"),
+			Annotations:     instance.GetAnnotations(),
+			OwnerReferences: instance.OwnerReferences(),
+		},
+		Rules: appNamespacedRules,
+	}
+}
+
+func newAppRoleBindingForCR(instance *appv1.VDICluster) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            instance.GetAppName(),
+			Namespace:       instance.GetCoreNamespace(),
+			Labels:          instance.GetComponentLabels("app"),
+			Annotations:     instance.GetAnnotations(),
+			OwnerReferences: instance.OwnerReferences(),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      instance.GetAppName(),
+				Namespace: instance.GetCoreNamespace(),
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
 			Name:     instance.GetAppName(),
 			APIGroup: "rbac.authorization.k8s.io",
 		},

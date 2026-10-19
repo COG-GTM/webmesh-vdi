@@ -119,6 +119,55 @@ func ClusterRoleBinding(ctx context.Context, reqLogger logr.Logger, c client.Cli
 	return nil
 }
 
+// Role will ensure a namespaced Role with the cluster.
+func Role(ctx context.Context, reqLogger logr.Logger, c client.Client, role *krbacv1.Role) error {
+	if err := k8sutil.SetCreationSpecAnnotation(&role.ObjectMeta, role); err != nil {
+		return err
+	}
+	found := &krbacv1.Role{}
+	if err := c.Get(ctx, types.NamespacedName{Name: role.Name, Namespace: role.Namespace}, found); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return err
+		}
+		reqLogger.Info("Creating new role", "Name", role.Name, "Namespace", role.Namespace)
+		return c.Create(ctx, role)
+	}
+
+	if !k8sutil.CreationSpecsEqual(role.ObjectMeta, found.ObjectMeta) {
+		reqLogger.Info("Role annotation spec has changed, updating", "Name", role.Name, "Namespace", role.Namespace)
+		found.Rules = role.Rules
+		found.SetAnnotations(role.GetAnnotations())
+		return c.Update(ctx, found)
+	}
+
+	return nil
+}
+
+// RoleBinding will ensure a namespaced role binding.
+func RoleBinding(ctx context.Context, reqLogger logr.Logger, c client.Client, roleBinding *krbacv1.RoleBinding) error {
+	if err := k8sutil.SetCreationSpecAnnotation(&roleBinding.ObjectMeta, roleBinding); err != nil {
+		return err
+	}
+	found := &krbacv1.RoleBinding{}
+	if err := c.Get(ctx, types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, found); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return err
+		}
+		reqLogger.Info("Creating new role binding", "Name", roleBinding.Name, "Namespace", roleBinding.Namespace)
+		return c.Create(ctx, roleBinding)
+	}
+
+	if !k8sutil.CreationSpecsEqual(roleBinding.ObjectMeta, found.ObjectMeta) {
+		reqLogger.Info("Role binding annotation spec has changed, updating", "Name", roleBinding.Name, "Namespace", roleBinding.Namespace)
+		found.Subjects = roleBinding.Subjects
+		found.RoleRef = roleBinding.RoleRef
+		found.SetAnnotations(roleBinding.GetAnnotations())
+		return c.Update(ctx, found)
+	}
+
+	return nil
+}
+
 // VDIRole reconciles a VDIRole with the cluster.
 func VDIRole(ctx context.Context, reqLogger logr.Logger, c client.Client, role *rbacv1.VDIRole) error {
 	if err := k8sutil.SetCreationSpecAnnotation(&role.ObjectMeta, role); err != nil {

@@ -121,6 +121,12 @@ func (f *Reconciler) Reconcile(ctx context.Context, reqLogger logr.Logger, insta
 	if err := reconcile.ClusterRoleBinding(ctx, reqLogger, f.client, newRoleBindingsForCR(instance)); err != nil {
 		return err
 	}
+	if err := reconcile.Role(ctx, reqLogger, f.client, newAppRoleForCR(instance)); err != nil {
+		return err
+	}
+	if err := reconcile.RoleBinding(ctx, reqLogger, f.client, newAppRoleBindingForCR(instance)); err != nil {
+		return err
+	}
 
 	// Reconcile the PKI. This will ensure a CA as well as both server and client certificates
 	// for the app deployment.
