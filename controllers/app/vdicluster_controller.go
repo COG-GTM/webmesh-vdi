@@ -53,7 +53,7 @@ type VDIClusterReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=endpoints;pods/log;configmaps;serviceaccounts;secrets;services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;replicasets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.kvdi.io,resources=vdiroles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=app.kvdi.io,resources=vdiclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=app.kvdi.io,resources=vdiclusters/status,verbs=get;update;patch
@@ -117,5 +117,7 @@ func (r *VDIClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&krbacv1.ClusterRole{}).
 		Owns(&krbacv1.ClusterRoleBinding{}).
+		Owns(&krbacv1.Role{}).
+		Owns(&krbacv1.RoleBinding{}).
 		Complete(r)
 }

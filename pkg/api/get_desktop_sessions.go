@@ -29,6 +29,7 @@ import (
 	v1 "github.com/kvdi/kvdi/apis/meta/v1"
 	"github.com/kvdi/kvdi/pkg/types"
 	"github.com/kvdi/kvdi/pkg/util/apiutil"
+	"github.com/kvdi/kvdi/pkg/util/k8sutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,11 +54,18 @@ func (d *desktopAPI) GetDesktopSessions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// display/audio locks are created in the app's own namespace
+	lockNamespace, err := k8sutil.GetThisPodNamespace()
+	if err != nil {
+		apiutil.ReturnAPIError(err, w)
+		return
+	}
+
 	// retrieve all active display locks
 	if err := d.client.List(
 		context.TODO(),
 		displayLocks,
-		client.InNamespace(metav1.NamespaceAll),
+		client.InNamespace(lockNamespace),
 		client.MatchingLabels(d.vdiCluster.GetComponentLabels("display-lock")),
 	); err != nil {
 		apiutil.ReturnAPIError(err, w)
@@ -68,7 +76,7 @@ func (d *desktopAPI) GetDesktopSessions(w http.ResponseWriter, r *http.Request) 
 	if err := d.client.List(
 		context.TODO(),
 		audioLocks,
-		client.InNamespace(metav1.NamespaceAll),
+		client.InNamespace(lockNamespace),
 		client.MatchingLabels(d.vdiCluster.GetComponentLabels("audio-lock")),
 	); err != nil {
 		apiutil.ReturnAPIError(err, w)

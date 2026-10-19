@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	krbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func newFakeSvcAccount() *corev1.ServiceAccount {
@@ -86,6 +87,53 @@ func TestReconcileClusterRoleBinding(t *testing.T) {
 	}
 	if err := ClusterRoleBinding(context.TODO(), testLogger, c, role); err != nil {
 		t.Error("Expected no error, got:", err)
+	}
+}
+
+func TestReconcileRole(t *testing.T) {
+	c := getFakeClient(t)
+	role := &krbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: "fake-role", Namespace: "fake-namespace"}}
+	if err := Role(context.TODO(), testLogger, c, role); err != nil {
+		t.Error("Expected no error, got:", err)
+	}
+	updated := &krbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{Name: "fake-role", Namespace: "fake-namespace"},
+		Rules:      []krbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"secrets"}, Verbs: []string{"get"}}},
+	}
+	if err := Role(context.TODO(), testLogger, c, updated); err != nil {
+		t.Error("Expected no error, got:", err)
+	}
+	found := &krbacv1.Role{}
+	if err := c.Get(context.TODO(), types.NamespacedName{Name: "fake-role", Namespace: "fake-namespace"}, found); err != nil {
+		t.Fatal("Expected role to exist, got:", err)
+	}
+	if len(found.Rules) != 1 {
+		t.Error("Expected role rules to be updated, got:", found.Rules)
+	}
+}
+
+func TestReconcileRoleBinding(t *testing.T) {
+	c := getFakeClient(t)
+	rb := &krbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "fake-role-binding", Namespace: "fake-namespace"}}
+	if err := RoleBinding(context.TODO(), testLogger, c, rb); err != nil {
+		t.Error("Expected no error, got:", err)
+	}
+	if err := RoleBinding(context.TODO(), testLogger, c, rb); err != nil {
+		t.Error("Expected no error, got:", err)
+	}
+	changed := &krbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "fake-role-binding", Namespace: "fake-namespace"},
+		RoleRef:    krbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: "new-role"},
+	}
+	if err := RoleBinding(context.TODO(), testLogger, c, changed); err != nil {
+		t.Error("Expected no error, got:", err)
+	}
+	found := &krbacv1.RoleBinding{}
+	if err := c.Get(context.TODO(), types.NamespacedName{Name: "fake-role-binding", Namespace: "fake-namespace"}, found); err != nil {
+		t.Fatal("Expected role binding to exist, got:", err)
+	}
+	if found.RoleRef.Name != "new-role" {
+		t.Error("Expected role binding to be recreated with new roleRef, got:", found.RoleRef)
 	}
 }
 
