@@ -121,6 +121,20 @@ func TestReconcileRoleBinding(t *testing.T) {
 	if err := RoleBinding(context.TODO(), testLogger, c, rb); err != nil {
 		t.Error("Expected no error, got:", err)
 	}
+	changed := &krbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "fake-role-binding", Namespace: "fake-namespace"},
+		RoleRef:    krbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: "new-role"},
+	}
+	if err := RoleBinding(context.TODO(), testLogger, c, changed); err != nil {
+		t.Error("Expected no error, got:", err)
+	}
+	found := &krbacv1.RoleBinding{}
+	if err := c.Get(context.TODO(), types.NamespacedName{Name: "fake-role-binding", Namespace: "fake-namespace"}, found); err != nil {
+		t.Fatal("Expected role binding to exist, got:", err)
+	}
+	if found.RoleRef.Name != "new-role" {
+		t.Error("Expected role binding to be recreated with new roleRef, got:", found.RoleRef)
+	}
 }
 
 func newFakeVDIRole() *rbacv1.VDIRole {

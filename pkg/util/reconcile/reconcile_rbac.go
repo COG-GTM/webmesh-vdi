@@ -157,10 +157,18 @@ func RoleBinding(ctx context.Context, reqLogger logr.Logger, c client.Client, ro
 		return c.Create(ctx, roleBinding)
 	}
 
+	// RoleRef is immutable, so the binding has to be recreated when it changes
+	if found.RoleRef != roleBinding.RoleRef {
+		reqLogger.Info("Role binding roleRef has changed, recreating", "Name", roleBinding.Name, "Namespace", roleBinding.Namespace)
+		if err := c.Delete(ctx, found); client.IgnoreNotFound(err) != nil {
+			return err
+		}
+		return c.Create(ctx, roleBinding)
+	}
+
 	if !k8sutil.CreationSpecsEqual(roleBinding.ObjectMeta, found.ObjectMeta) {
 		reqLogger.Info("Role binding annotation spec has changed, updating", "Name", roleBinding.Name, "Namespace", roleBinding.Namespace)
 		found.Subjects = roleBinding.Subjects
-		found.RoleRef = roleBinding.RoleRef
 		found.SetAnnotations(roleBinding.GetAnnotations())
 		return c.Update(ctx, found)
 	}
