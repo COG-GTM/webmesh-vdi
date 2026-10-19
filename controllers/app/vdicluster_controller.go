@@ -117,5 +117,7 @@ func (r *VDIClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&krbacv1.ClusterRole{}).
 		Owns(&krbacv1.ClusterRoleBinding{}).
+		Owns(&krbacv1.Role{}).
+		Owns(&krbacv1.RoleBinding{}).
 		Complete(r)
 }
