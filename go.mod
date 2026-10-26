@@ -2,6 +2,8 @@ module github.com/kvdi/kvdi
 
 go 1.21
 
+toolchain go1.25.6
+
 require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.0
