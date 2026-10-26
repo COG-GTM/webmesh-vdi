@@ -1,16 +1,25 @@
-issues:
-  exclude-rules:
-  - path: pkg/cmd
-    linters:
-    - errcheck
-  - path: pkg/api
-    linters:
-    - deadcode
-    - unused
-    - staticcheck
-  - path: _test\.go
-    linters:
-    - errcheck
-    - staticcheck
-    - deadcode
-    - unused
+version: "2"
+linters:
+  settings:
+    staticcheck:
+      # Match golangci-lint v1 defaults (staticcheck + gosimple; stylecheck was not enabled).
+      checks: ["all", "-ST*", "-QF*"]
+  exclusions:
+    presets:
+    - comments
+    - common-false-positives
+    - legacy
+    - std-error-handling
+    rules:
+    - path: pkg/cmd
+      linters:
+      - errcheck
+    - path: pkg/api
+      linters:
+      - unused
+      - staticcheck
+    - path: _test\.go
+      linters:
+      - errcheck
+      - staticcheck
+      - unused
