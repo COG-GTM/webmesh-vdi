@@ -237,7 +237,7 @@ push-proxy: build-proxy
 ##
 
 GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
-GOLANGCI_VERSION ?= v1.53.3
+GOLANGCI_VERSION ?= v2.15.0
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
 
