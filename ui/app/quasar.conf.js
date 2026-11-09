@@ -77,6 +77,9 @@ module.exports = function (/* ctx */) {
     build: {
       vueRouterMode: 'hash', // available values: 'hash', 'history'
 
+      // swagger-ui 5.x ships ES2020+ syntax that webpack 4 cannot parse
+      transpileDependencies: [/[\\/]node_modules[\\/]swagger-ui[\\/]dist[\\/]/],
+
       // rtl: false, // https://quasar.dev/options/rtl-support
       // showProgress: false,
       gzip: true,

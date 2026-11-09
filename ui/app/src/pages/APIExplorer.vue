@@ -22,7 +22,7 @@ along with kvdi.  If not, see <https://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import SwaggerUIBundle from 'swagger-ui'
+import SwaggerUIBundle from 'swagger-ui/dist/swagger-ui-bundle'
 
 export default {
   name: 'APIExplorer',
@@ -78,11 +78,9 @@ export default {
           }
           return response
         },
+        queryConfigEnabled: false,
         presets: [
           SwaggerUIBundle.presets.apis
-        ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
         ]
       })
       if (this.$userStore.getters.isLoggedIn) {
