@@ -2,7 +2,6 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
@@ -10,6 +9,9 @@ rules:
   resources:
   - configmaps
   - endpoints
+  - persistentvolumeclaims
+  - persistentvolumes
+  - pods
   - pods/log
   - secrets
   - serviceaccounts
@@ -29,22 +31,6 @@ rules:
   verbs:
   - get
   - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  - persistentvolumes
-  - pods
-  - secrets
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - app.kvdi.io
