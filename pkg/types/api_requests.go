@@ -116,7 +116,7 @@ func (r *CreateUserRequest) Validate() error {
 	if r.Username == "" || r.Password == "" {
 		return errors.New("'username' and 'password' must be provided in the request")
 	}
-	if r.Roles == nil || len(r.Roles) == 0 {
+	if len(r.Roles) == 0 {
 		return errors.New("You must assign at least one role to the user")
 	}
 	if strings.Contains(r.Username, ":") {

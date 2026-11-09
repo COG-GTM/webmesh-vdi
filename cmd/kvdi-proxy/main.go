@@ -106,8 +106,7 @@ func main() {
 		RecordingDeviceChannels:    micDeviceChannels,
 	})
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Error(err, "Error running proxy server")
-		os.Exit(1)
-	}
+	err := server.ListenAndServe()
+	log.Error(err, "Error running proxy server")
+	os.Exit(1)
 }
