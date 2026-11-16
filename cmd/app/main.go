@@ -28,6 +28,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/handlers"
@@ -113,6 +114,21 @@ func formatLog(writer io.Writer, params handlers.LogFormatterParams) {
 	}
 }
 
+// maxStaticRanges bounds the number of byte ranges accepted on static asset
+// requests (CVE-2026-78667 / GO-2026-6609).
+const maxStaticRanges = 16
+
+// limitRangeHeader drops Range headers that request more than maxStaticRanges
+// ranges so the full asset is served instead.
+func limitRangeHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if rng := r.Header.Get("Range"); rng != "" && strings.Count(rng, ",") >= maxStaticRanges {
+			r.Header.Del("Range")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func newServer(cfg *rest.Config, vdiCluster string, enableCORS bool) (*http.Server, error) {
 	r := mux.NewRouter()
 	// build the api router with our kubeconfig
@@ -123,7 +139,7 @@ func newServer(cfg *rest.Config, vdiCluster string, enableCORS bool) (*http.Serv
 	// api routes
 	r.PathPrefix("/api").Handler(apiRouter)
 	// vue frontend
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("/static/")))
+	r.PathPrefix("/").Handler(limitRangeHeader(http.FileServer(http.Dir("/static/"))))
 	wrappedRouter := handlers.ProxyHeaders(
 		handlers.CompressHandler(
 			handlers.CustomLoggingHandler(os.Stdout, r, formatLog),
