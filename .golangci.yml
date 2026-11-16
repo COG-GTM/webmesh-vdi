@@ -1,16 +1,40 @@
-issues:
-  exclude-rules:
-  - path: pkg/cmd
-    linters:
-    - errcheck
-  - path: pkg/api
-    linters:
-    - deadcode
-    - unused
-    - staticcheck
-  - path: _test\.go
-    linters:
-    - errcheck
-    - staticcheck
-    - deadcode
-    - unused
+version: "2"
+linters:
+  settings:
+    staticcheck:
+      # Keep the v1 linter set (staticcheck + gosimple); stylecheck and quickfix were not enabled before.
+      checks:
+        - all
+        - "-ST*"
+        - "-QF*"
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+        path: pkg/cmd
+      - linters:
+          - staticcheck
+          - unused
+        path: pkg/api
+      - linters:
+          - errcheck
+          - staticcheck
+          - unused
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -56,11 +56,10 @@ func NewServerTLSConfig() (*tls.Config, error) {
 		return nil, err
 	}
 	tlsConfig := &tls.Config{
-		ClientCAs:                caCertPool,
-		Certificates:             []tls.Certificate{cert},
-		ClientAuth:               tls.RequireAndVerifyClientCert,
-		PreferServerCipherSuites: true,
-		MinVersion:               minTLSVersion,
+		ClientCAs:    caCertPool,
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		MinVersion:   minTLSVersion,
 	}
 	return tlsConfig, nil
 }
