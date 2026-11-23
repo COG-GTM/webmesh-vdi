@@ -111,13 +111,13 @@ func RuleIncludes(r, ruleToCheck rbacv1.Rule, resourceGetter types.ResourceGette
 				}
 			}
 		}
-		// Service accounts cannot be enumerated across namespaces here, so every
-		// proposed "use" pattern must already be held verbatim or covered by a match-all.
-		if (resource == rbacv1.ResourceAll || resource == rbacv1.ResourceServiceAccounts) && ruleToCheck.HasVerb(rbacv1.VerbUse) {
-			for _, pattern := range ruleToCheck.ResourcePatterns {
-				if !rulePatternsCover(r, pattern) {
-					return false
-				}
+	}
+	// Service accounts cannot be enumerated across namespaces here, so every
+	// proposed "use" pattern must already be held verbatim or covered by a match-all.
+	if ruleToCheck.HasResourceType(rbacv1.ResourceServiceAccounts) && ruleToCheck.HasVerb(rbacv1.VerbUse) {
+		for _, pattern := range ruleToCheck.ResourcePatterns {
+			if !rulePatternsCover(r, pattern) {
+				return false
 			}
 		}
 	}
