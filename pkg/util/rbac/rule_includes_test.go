@@ -38,7 +38,12 @@ func TestRuleIncludesServiceAccountPatterns(t *testing.T) {
 		{"no held patterns", saRule(), saRule(".*"), false},
 		{
 			"widen via resource all",
-			saRule("^builder$"),
+			rbacv1.Rule{
+				Verbs:            []rbacv1.Verb{rbacv1.VerbUse},
+				Resources:        []rbacv1.Resource{rbacv1.ResourceAll},
+				ResourcePatterns: []string{"^builder$"},
+				Namespaces:       []string{"team-a"},
+			},
 			rbacv1.Rule{
 				Verbs:            []rbacv1.Verb{rbacv1.VerbUse},
 				Resources:        []rbacv1.Resource{rbacv1.ResourceAll},
@@ -46,6 +51,22 @@ func TestRuleIncludesServiceAccountPatterns(t *testing.T) {
 				Namespaces:       []string{"team-a"},
 			},
 			false,
+		},
+		{
+			"read-only grant ignores service account patterns",
+			rbacv1.Rule{
+				Verbs:            []rbacv1.Verb{rbacv1.VerbAll},
+				Resources:        []rbacv1.Resource{rbacv1.ResourceAll},
+				ResourcePatterns: []string{"^builder$"},
+				Namespaces:       []string{"team-a"},
+			},
+			rbacv1.Rule{
+				Verbs:            []rbacv1.Verb{rbacv1.VerbRead},
+				Resources:        []rbacv1.Resource{rbacv1.ResourceAll},
+				ResourcePatterns: []string{"^viewer$"},
+				Namespaces:       []string{"team-a"},
+			},
+			true,
 		},
 	}
 	for _, tc := range cases {
