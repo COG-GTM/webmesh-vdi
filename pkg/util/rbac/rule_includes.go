@@ -111,6 +111,24 @@ func RuleIncludes(r, ruleToCheck rbacv1.Rule, resourceGetter types.ResourceGette
 				}
 			}
 		}
+		// Service accounts cannot be enumerated across namespaces here, so every
+		// proposed pattern must already be held verbatim or covered by a match-all.
+		if resource == rbacv1.ResourceAll || resource == rbacv1.ResourceServiceAccounts {
+			for _, pattern := range ruleToCheck.ResourcePatterns {
+				if !rulePatternsCover(r, pattern) {
+					return false
+				}
+			}
+		}
 	}
 	return true
+}
+
+func rulePatternsCover(r rbacv1.Rule, pattern string) bool {
+	for _, held := range r.ResourcePatterns {
+		if held == pattern || held == ".*" || held == "^.*$" {
+			return true
+		}
+	}
+	return false
 }
