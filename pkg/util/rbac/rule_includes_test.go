@@ -53,6 +53,22 @@ func TestRuleIncludesServiceAccountPatterns(t *testing.T) {
 			false,
 		},
 		{
+			"widen via proposed wildcard verb",
+			rbacv1.Rule{
+				Verbs:            []rbacv1.Verb{rbacv1.VerbAll},
+				Resources:        []rbacv1.Resource{rbacv1.ResourceServiceAccounts},
+				ResourcePatterns: []string{"^builder$"},
+				Namespaces:       []string{"team-a"},
+			},
+			rbacv1.Rule{
+				Verbs:            []rbacv1.Verb{rbacv1.VerbAll},
+				Resources:        []rbacv1.Resource{rbacv1.ResourceServiceAccounts},
+				ResourcePatterns: []string{".*"},
+				Namespaces:       []string{"team-a"},
+			},
+			false,
+		},
+		{
 			"read-only grant ignores service account patterns",
 			rbacv1.Rule{
 				Verbs:            []rbacv1.Verb{rbacv1.VerbAll},
